@@ -6,21 +6,24 @@ import L from "leaflet";
 import type { Festival } from "../../lib/types";
 import { genreColor } from "../../lib/utils";
 
-// Suppress Leaflet's default icon URL resolution (not needed with divIcon)
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 
-function createMarkerIcon(accentColor: string, isHovered = false) {
-  const size = isHovered ? 20 : 16;
+function createMarkerIcon(accentColor: string, active: boolean) {
+  const size = active ? 22 : 16;
   const offset = size / 2;
+  // Active marker gets a subtle pulse ring via box-shadow
+  const shadow = active
+    ? `0 0 0 5px ${accentColor}28, 0 2px 8px rgba(0,0,0,0.22)`
+    : `0 2px 8px rgba(0,0,0,0.22), 0 0 0 0.5px rgba(0,0,0,0.08)`;
   return L.divIcon({
-    html: `<div class="festival-pin" style="
-      width: ${size}px;
-      height: ${size}px;
-      border-radius: 50%;
-      background: ${accentColor};
-      border: 2.5px solid #ffffff;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.24), 0 0 0 0.5px rgba(0,0,0,0.08);
-      cursor: pointer;
+    html: `<div style="
+      width:${size}px;height:${size}px;
+      border-radius:50%;
+      background:${accentColor};
+      border:2.5px solid #fff;
+      box-shadow:${shadow};
+      transition:width 160ms cubic-bezier(0.22,1,0.36,1),height 160ms cubic-bezier(0.22,1,0.36,1);
+      cursor:pointer;
     "></div>`,
     className: "",
     iconSize: [size, size],
@@ -33,11 +36,15 @@ export default function FestivalMap({
   center = [20, 0],
   zoom = 2,
   scrollWheelZoom = true,
+  hoveredId = null,
+  onHoverChange,
 }: {
   festivals: Festival[];
   center?: [number, number];
   zoom?: number;
   scrollWheelZoom?: boolean;
+  hoveredId?: number | null;
+  onHoverChange?: (id: number | null) => void;
 }) {
   const router = useRouter();
 
@@ -58,9 +65,10 @@ export default function FestivalMap({
       {festivals.map((festival) => {
         if (!festival.latitude || !festival.longitude) return null;
 
-        const color = festival.category ? genreColor(festival.category) : null;
-        const accentColor = color?.text ?? "#6366F1";
-        const icon = createMarkerIcon(accentColor);
+        const color      = festival.category ? genreColor(festival.category) : null;
+        const accent     = color?.text ?? "#6366F1";
+        const isActive   = hoveredId === festival.id;
+        const icon       = createMarkerIcon(accent, isActive);
 
         return (
           <Marker
@@ -68,13 +76,9 @@ export default function FestivalMap({
             position={[festival.latitude, festival.longitude]}
             icon={icon}
             eventHandlers={{
-              click: () => router.push(`/festival/${festival.id}`),
-              mouseover: (e) => {
-                e.target.setIcon(createMarkerIcon(accentColor, true));
-              },
-              mouseout: (e) => {
-                e.target.setIcon(createMarkerIcon(accentColor, false));
-              },
+              click:     () => router.push(`/festival/${festival.id}`),
+              mouseover: () => onHoverChange?.(festival.id),
+              mouseout:  () => onHoverChange?.(null),
             }}
           >
             <Tooltip
@@ -83,9 +87,7 @@ export default function FestivalMap({
               opacity={1}
               className="festival-tooltip"
             >
-              <span className="festival-tooltip-name">
-                {festival.festival_name}
-              </span>
+              <span className="festival-tooltip-name">{festival.festival_name}</span>
               {(festival.city || festival.country) && (
                 <span className="festival-tooltip-location">
                   {[festival.city, festival.country].filter(Boolean).join(", ")}

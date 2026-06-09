@@ -6,8 +6,10 @@ export const fr: Translations = {
     login: "Connexion",
   },
   home: {
-    platform: "Plateforme mondiale",
+    platform: "Appels ouverts dans le monde",
     tagline: ["Trouve ton prochain", "festival."],
+    live: "En direct",
+    openCalls: (n) => `${n} appel${n !== 1 ? "s" : ""} ouvert${n !== 1 ? "s" : ""}`,
     countStats: (festivals, countries) =>
       `${festivals.toLocaleString()} festivals · ${countries} pays`,
     opportunities: (n) =>
@@ -22,6 +24,8 @@ export const fr: Translations = {
     emptyHint: "Modifiez vos filtres pour élargir la recherche",
     resetFilters: "Réinitialiser les filtres",
     festivals: (n) => `${n} festival${n !== 1 ? "s" : ""}`,
+    genres: (n) => `${n} genre${n !== 1 ? "s" : ""}`,
+    countries: (n) => `${n} pay${n !== 1 ? "s" : ""}`,
   },
   card: {
     apply: "Postuler →",

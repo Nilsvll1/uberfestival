@@ -8,6 +8,8 @@ export type Translations = {
   home: {
     platform: string;
     tagline: [string, string];
+    live: string;
+    openCalls: (n: number) => string;
     countStats: (festivals: number, countries: number) => string;
     opportunities: (n: number) => string;
     search: string;
@@ -20,6 +22,8 @@ export type Translations = {
     emptyHint: string;
     resetFilters: string;
     festivals: (n: number) => string;
+    genres: (n: number) => string;
+    countries: (n: number) => string;
   };
   card: {
     apply: string;

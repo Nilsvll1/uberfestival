@@ -6,8 +6,10 @@ export const en: Translations = {
     login: "Sign in",
   },
   home: {
-    platform: "Global platform",
+    platform: "Open calls worldwide",
     tagline: ["Find your next", "festival."],
+    live: "Live",
+    openCalls: (n) => `${n} open call${n !== 1 ? "s" : ""}`,
     countStats: (festivals, countries) =>
       `${festivals.toLocaleString()} festivals · ${countries} ${countries !== 1 ? "countries" : "country"}`,
     opportunities: (n) =>
@@ -22,6 +24,8 @@ export const en: Translations = {
     emptyHint: "Adjust your filters to broaden the search",
     resetFilters: "Reset filters",
     festivals: (n) => `${n} festival${n !== 1 ? "s" : ""}`,
+    genres: (n) => `${n} genre${n !== 1 ? "s" : ""}`,
+    countries: (n) => `${n} countr${n !== 1 ? "ies" : "y"}`,
   },
   card: {
     apply: "Apply →",

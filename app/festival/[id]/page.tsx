@@ -86,14 +86,13 @@ export default async function FestivalPage({
           }}
         />
 
-        {/* Back button */}
+        {/* Back button — frosted glass pill */}
         <Link
           href="/"
-          className="absolute top-5 left-5 lg:top-7 lg:left-8 z-10 flex items-center gap-1.5 transition-opacity hover:opacity-75"
-          style={{ color: "rgba(255,255,255,0.80)", fontSize: "13px" }}
+          className="hero-back-btn absolute top-5 left-5 lg:top-7 lg:left-8 z-10"
         >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M9 11L5 7l4-4" stroke="currentColor" strokeWidth="1.5"
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+            <path d="M9 11L5 7l4-4" stroke="currentColor" strokeWidth="1.6"
               strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           {t.festival.back}
@@ -148,37 +147,30 @@ export default async function FestivalPage({
           </h1>
 
           {/* Deadline + CTA */}
-          <div className="hero-cta flex items-center gap-3 mt-5 flex-wrap">
-            {deadline && (
-              <span
-                className="text-[12.5px] font-semibold"
-                style={{
-                  color: dlColor,
-                  textDecoration: deadline.status === "expired" ? "line-through" : "none",
-                }}
-              >
-                {deadline.label}
-              </span>
-            )}
+          <div className="hero-cta flex items-center gap-4 mt-6 flex-wrap">
             {festival.application_url && (
               <a
                 href={festival.application_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 font-semibold rounded-[10px] transition-transform hover:-translate-y-0.5"
-                style={{
-                  background: "rgba(255,255,255,0.97)",
-                  color: "#09090B",
-                  fontSize: "13.5px",
-                  padding: "9px 18px",
-                  boxShadow: "0 2px 16px rgba(0,0,0,0.3)",
-                }}
+                className="hero-apply-btn"
               >
                 {t.festival.apply}
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M2.5 9.5l7-7M4 2.5h5.5V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                  <path d="M2.5 9.5l7-7M4 2.5h5.5V8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </a>
+            )}
+            {deadline && (
+              <span
+                className="text-[12.5px] font-medium"
+                style={{
+                  color: deadline.status === "expired" ? "rgba(255,255,255,0.40)" : "rgba(255,255,255,0.75)",
+                  textDecoration: deadline.status === "expired" ? "line-through" : "none",
+                }}
+              >
+                {deadline.label}
+              </span>
             )}
           </div>
         </div>

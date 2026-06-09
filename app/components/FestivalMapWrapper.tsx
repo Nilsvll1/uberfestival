@@ -11,9 +11,7 @@ const FestivalMap = dynamic(() => import("./FestivalMap"), {
 function MapSkeleton() {
   return (
     <div className="h-full w-full relative overflow-hidden" style={{ background: "#e8edf2" }}>
-      {/* Shimmer sweep */}
       <div className="map-skeleton-shimmer" />
-      {/* Fake dot cluster — center of map */}
       <div style={{ position: "absolute", inset: 0 }}>
         {[
           [38, 52], [42, 56], [35, 48], [45, 44],
@@ -45,12 +43,16 @@ export default function FestivalMapWrapper({
   center,
   zoom,
   scrollWheelZoom,
+  hoveredId,
+  onHoverChange,
 }: {
   festivals: Festival[];
   className?: string;
   center?: [number, number];
   zoom?: number;
   scrollWheelZoom?: boolean;
+  hoveredId?: number | null;
+  onHoverChange?: (id: number | null) => void;
 }) {
   return (
     <div className={`w-full overflow-hidden ${className}`}>
@@ -59,6 +61,8 @@ export default function FestivalMapWrapper({
         center={center}
         zoom={zoom}
         scrollWheelZoom={scrollWheelZoom}
+        hoveredId={hoveredId}
+        onHoverChange={onHoverChange}
       />
     </div>
   );

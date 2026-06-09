@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* ─── Design tokens ────────────────────────────────────────── */
+/* ─── Design tokens ─────────────────────────────────────────── */
 :root {
   --bg:             #F5F5F7;
   --surface:        #FFFFFF;
@@ -15,10 +15,10 @@
   --accent-hover:   #4F52E3;
   --accent-ring:    rgba(99, 102, 241, 0.22);
 
-  --shadow-xs:   0 1px 2px rgba(0,0,0,0.05);
-  --shadow-sm:   0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md:   0 4px 8px rgba(0,0,0,0.06),  0 2px 4px rgba(0,0,0,0.04);
-  --shadow-lg:   0 12px 32px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.04);
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 8px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.04);
   --shadow-card-hover:
     0 12px 32px -6px rgba(0,0,0,0.13),
     0 4px 10px -4px rgba(0,0,0,0.06),
@@ -32,13 +32,13 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* ─── Base ─────────────────────────────────────────────────── */
+/* ─── Base ──────────────────────────────────────────────────── */
 html, body { height: 100%; }
 
 html {
   background:
-    radial-gradient(ellipse 80% 50% at 65% -5%,  rgba(99,102,241,0.06)  0%, transparent 60%),
-    radial-gradient(ellipse 50% 40% at 5%  95%,  rgba(139,92,246,0.04)  0%, transparent 55%),
+    radial-gradient(ellipse 80% 50% at 65% -5%, rgba(99,102,241,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 5% 95%,  rgba(139,92,246,0.04) 0%, transparent 55%),
     #F5F5F7;
 }
 
@@ -55,26 +55,24 @@ body {
 ::-webkit-scrollbar-thumb  { background: rgba(0,0,0,0.13); border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.22); }
 
-/* ─── Card — premium hover ──────────────────────────────────── */
+/* ─── Card — hover + dimming ────────────────────────────────── */
 .festival-card {
   border-color: var(--border);
-  will-change: transform;
+  will-change: transform, opacity;
   transition:
-    transform    320ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow   320ms cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 220ms ease;
+    transform    300ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow   300ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 200ms ease,
+    opacity      200ms ease;
 }
 .festival-card:hover {
   transform: translateY(-3px);
-  box-shadow: var(--shadow-card-hover);
-  border-color: rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-card-hover) !important;
+  border-color: rgba(0,0,0,0.08) !important;
+  opacity: 1 !important;
 }
-.festival-card:active {
-  transform: translateY(-1px);
-  transition-duration: 80ms;
-}
+/* Override dimmed when parent li is hovered */
 
-/* Image zoom on card hover */
 .card-img {
   transition: transform 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
   will-change: transform;
@@ -92,7 +90,16 @@ body {
   animation: fadeUp 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* ─── Hero image entrance ───────────────────────────────────── */
+/* ─── Page enter ────────────────────────────────────────────── */
+@keyframes pageEnter {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.page-enter {
+  animation: pageEnter 300ms ease both;
+}
+
+/* ─── Hero — image entrance ─────────────────────────────────── */
 @keyframes heroZoom {
   from { transform: scale(1.04); opacity: 0.9; }
   to   { transform: scale(1);    opacity: 1;   }
@@ -101,22 +108,70 @@ body {
   animation: heroZoom 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
 }
 
-/* ─── Hero text entrance ────────────────────────────────────── */
+/* ─── Hero — text stagger ───────────────────────────────────── */
 @keyframes heroReveal {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(18px); }
   to   { opacity: 1; transform: translateY(0);    }
 }
-.hero-meta  { animation: heroReveal 700ms cubic-bezier(0.22, 1, 0.36, 1)  80ms both; }
-.hero-title { animation: heroReveal 700ms cubic-bezier(0.22, 1, 0.36, 1) 180ms both; }
-.hero-cta   { animation: heroReveal 700ms cubic-bezier(0.22, 1, 0.36, 1) 310ms both; }
+.hero-meta  { animation: heroReveal 650ms cubic-bezier(0.22, 1, 0.36, 1)  80ms both; }
+.hero-title { animation: heroReveal 650ms cubic-bezier(0.22, 1, 0.36, 1) 170ms both; }
+.hero-cta   { animation: heroReveal 650ms cubic-bezier(0.22, 1, 0.36, 1) 300ms both; }
 
-/* ─── Page enter ────────────────────────────────────────────── */
-@keyframes pageEnter {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+/* ─── Hero — frosted glass back button ─────────────────────── */
+.hero-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px 7px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.92);
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.20);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-.page-enter {
-  animation: pageEnter 280ms ease both;
+.hero-back-btn:hover {
+  background: rgba(255,255,255,0.20);
+  border-color: rgba(255,255,255,0.30);
+  transform: translateX(-2px);
+}
+
+/* ─── Hero — premium apply button ──────────────────────────── */
+.hero-apply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #09090B;
+  background: rgba(255,255,255,0.97);
+  box-shadow:
+    0 4px 28px rgba(0,0,0,0.32),
+    0 1px 4px rgba(0,0,0,0.18),
+    inset 0 1px 0 rgba(255,255,255,0.8);
+  transition:
+    transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 160ms ease;
+}
+.hero-apply-btn:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 36px rgba(0,0,0,0.38),
+    0 2px 6px rgba(0,0,0,0.20),
+    inset 0 1px 0 rgba(255,255,255,0.8);
+}
+.hero-apply-btn:active {
+  transform: translateY(0);
+  transition-duration: 80ms;
 }
 
 /* ─── Primary CTA ───────────────────────────────────────────── */
@@ -127,8 +182,7 @@ body {
     inset 0 1px 0 rgba(255,255,255,0.14);
   transition:
     transform  120ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 120ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity    120ms ease;
+    box-shadow 120ms ease;
   color: #fff;
 }
 .btn-cta:hover {
@@ -170,10 +224,25 @@ body {
 }
 .input-search::-webkit-search-cancel-button { display: none; }
 
-/* ─── Urgency pulse — < 7 day deadlines ────────────────────── */
+/* ─── Live indicator dot ────────────────────────────────────── */
+@keyframes livePulse {
+  0%, 100% { transform: scale(1);    opacity: 1;   box-shadow: 0 0 0 0   rgba(5,150,105,0.4); }
+  50%       { transform: scale(1.15); opacity: 0.9; box-shadow: 0 0 0 4px rgba(5,150,105,0);  }
+}
+.live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #059669;
+  animation: livePulse 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  flex-shrink: 0;
+}
+
+/* ─── Urgency pulse dot ─────────────────────────────────────── */
 @keyframes urgencyPulse {
   0%, 100% { opacity: 1;   transform: scale(1);   }
-  50%       { opacity: 0.4; transform: scale(1.6); }
+  50%       { opacity: 0.4; transform: scale(1.7); }
 }
 .urgency-dot {
   animation: urgencyPulse 1.8s ease-in-out infinite;
@@ -196,7 +265,7 @@ body {
   animation: shimmerSweep 2s ease-in-out infinite;
 }
 
-/* ─── Leaflet custom tooltip ────────────────────────────────── */
+/* ─── Leaflet tooltip ───────────────────────────────────────── */
 .festival-tooltip.leaflet-tooltip {
   background: rgba(255,255,255,0.97) !important;
   border: none !important;
@@ -205,9 +274,7 @@ body {
   padding: 7px 12px !important;
   pointer-events: none;
 }
-.festival-tooltip.leaflet-tooltip::before {
-  display: none !important;
-}
+.festival-tooltip.leaflet-tooltip::before { display: none !important; }
 .festival-tooltip-name {
   display: block;
   font-family: var(--font-geist-sans), system-ui, sans-serif;
@@ -236,9 +303,7 @@ body {
   border: none !important;
 }
 .leaflet-popup-content { margin: 0 !important; }
-.leaflet-popup-tip-container {
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.08));
-}
+.leaflet-popup-tip-container { filter: drop-shadow(0 2px 4px rgba(0,0,0,0.08)); }
 .leaflet-popup-tip { box-shadow: none !important; }
 .leaflet-control-zoom {
   border: none !important;
@@ -257,12 +322,6 @@ body {
 .leaflet-attribution-flag           { display: none !important; }
 .leaflet-container {
   font-family: var(--font-geist-sans), system-ui, sans-serif !important;
-  cursor: default !important;
-}
-/* Make markers feel interactive */
-.festival-pin {
-  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
-              box-shadow 180ms ease;
 }
 
 @import "leaflet/dist/leaflet.css";
