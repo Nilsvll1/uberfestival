@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { Festival } from "../../lib/types";
 import FestivalMapWrapper from "./FestivalMapWrapper";
 import FilterDropdown from "./FilterDropdown";
@@ -31,14 +32,20 @@ export default function SearchableFestivals({ festivals }: { festivals: Festival
   const { lang, t } = useI18n();
   const h = t.home;
 
-  const [query,     setQuery]     = useState("");
-  const [country,   setCountry]   = useState("");
-  const [category,  setCategory]  = useState("");
+  const router      = useRouter();
+  const pathname    = usePathname();
+  const searchParams = useSearchParams();
+
+  const [query,     setQuery]     = useState(() => searchParams.get("q")       ?? "");
+  const [country,   setCountry]   = useState(() => searchParams.get("country") ?? "");
+  const [category,  setCategory]  = useState(() => searchParams.get("genre")   ?? "");
   const [sort,      setSort]      = useState<SortKey>("deadline");
   const [hoveredId, setHoveredId] = useState<number | null>(null);
 
   const searchRef    = useRef<HTMLInputElement>(null);
   const mobileSearch = useRef<HTMLInputElement>(null);
+  const cardElRefs   = useRef<Map<number, HTMLLIElement>>(new Map());
+  const didMount     = useRef(false);
 
   const countries   = useMemo(() => [...new Set(festivals.map(f => f.country).filter(Boolean))].sort() as string[], [festivals]);
   const categories  = useMemo(() => [...new Set(festivals.map(f => f.category).filter(Boolean))].sort() as string[], [festivals]);
@@ -69,6 +76,24 @@ export default function SearchableFestivals({ festivals }: { festivals: Festival
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  // Sync filter state to URL (skip first render to avoid replacing URL on mount)
+  useEffect(() => {
+    if (!didMount.current) { didMount.current = true; return; }
+    const params = new URLSearchParams();
+    if (query)    params.set("q",       query);
+    if (country)  params.set("country", country);
+    if (category) params.set("genre",   category);
+    const qs = params.toString();
+    router.replace(pathname + (qs ? `?${qs}` : ""), { scroll: false });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, country, category]);
+
+  // Scroll active card into view when hover comes from the map
+  useEffect(() => {
+    if (hoveredId === null) return;
+    cardElRefs.current.get(hoveredId)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [hoveredId]);
 
   const hasSomeHover = hoveredId !== null;
 
@@ -254,6 +279,10 @@ export default function SearchableFestivals({ festivals }: { festivals: Festival
                   {filtered.map((festival, index) => (
                     <li
                       key={festival.id}
+                      ref={el => {
+                        if (el) cardElRefs.current.set(festival.id, el);
+                        else cardElRefs.current.delete(festival.id);
+                      }}
                       onMouseEnter={() => setHoveredId(festival.id)}
                       onMouseLeave={() => setHoveredId(null)}
                     >

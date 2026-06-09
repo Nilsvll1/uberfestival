@@ -5,6 +5,7 @@ import { getFestivalImage } from "../../lib/festivalImage";
 import type { Language } from "../../lib/i18n";
 import { getTranslations } from "../../lib/i18n";
 import SaveButton from "./SaveButton";
+import FestivalImage from "./FestivalImage";
 
 export default function FestivalCard({
   festival,
@@ -66,50 +67,8 @@ export default function FestivalCard({
         className="block relative overflow-hidden shrink-0"
         style={{ height: 200 }}
       >
-        {/* Gradient fallback */}
-        <div className="absolute inset-0" style={{ background: image.gradient }} />
-
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={image.url}
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover card-img"
-          loading="lazy"
-        />
-
-        {/* Cinematic overlay — heavier at bottom for legibility */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background: `linear-gradient(
-              to bottom,
-              rgba(0,0,0,0.04) 0%,
-              rgba(0,0,0,0.10) 50%,
-              rgba(0,0,0,${image.overlayStrength * 0.9}) 100%
-            )`,
-          }}
-        />
-
-        {/* Genre badge — bottom left */}
-        {color && festival.category && (
-          <div className="absolute bottom-3 left-3 z-10">
-            <span
-              className="inline-flex items-center text-[10px] font-semibold px-2 py-[3px] rounded-full"
-              style={{
-                background: "rgba(255,255,255,0.92)",
-                color: color.text,
-                backdropFilter: "blur(8px)",
-                letterSpacing: "0.04em",
-              }}
-            >
-              {festival.category}
-            </span>
-          </div>
-        )}
-
-        {/* Bookmark */}
-        <SaveButton label={t.card.save} />
+        <FestivalImage image={image} category={festival.category} color={color} />
+        <SaveButton label={t.card.save} festivalId={festival.id} />
       </Link>
 
       {/* ── Card body ────────────────────────────────────────── */}
