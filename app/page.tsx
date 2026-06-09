@@ -1,19 +1,28 @@
+import { Suspense } from "react";
 import { supabase } from "../lib/supabase";
-import FestivalMap from "./components/FestivalMap";
+import SearchableFestivals from "./components/SearchableFestivals";
 
 export default async function Home() {
   const { data, error } = await supabase
     .from("festivals")
-    .select("*");
+    .select(
+      "id, festival_name, city, country, category, application_url, submission_deadline, latitude, longitude"
+    );
 
   if (error) {
     return (
-      <main className="p-10">
-        <h1 className="text-3xl font-bold text-red-600">
-          Erreur Supabase
-        </h1>
-
-        <pre className="mt-4 p-4 bg-gray-100 rounded">
+      <main className="max-w-screen-xl mx-auto px-6 py-10">
+        <p className="text-sm font-medium" style={{ color: "#DC2626" }}>
+          Erreur de connexion à la base de données.
+        </p>
+        <pre
+          className="mt-2 text-xs rounded-2xl p-4 border"
+          style={{
+            background: "#fff",
+            borderColor: "var(--border)",
+            color: "var(--text-muted)",
+          }}
+        >
           {error.message}
         </pre>
       </main>
@@ -21,16 +30,17 @@ export default async function Home() {
   }
 
   return (
-    <main className="p-10">
-      <h1 className="text-4xl font-bold mb-6">
-        UberFestival
-      </h1>
-
-      <p className="text-xl mb-6">
-        Festivals trouvés : {data?.length ?? 0}
-      </p>
-
-      <FestivalMap festivals={data || []} />
+    <main className="max-w-screen-xl mx-auto px-6 py-6">
+      <Suspense
+        fallback={
+          <div
+            className="h-[60vh] w-full rounded-2xl border animate-pulse"
+            style={{ background: "#fff", borderColor: "var(--border)" }}
+          />
+        }
+      >
+        <SearchableFestivals festivals={data || []} />
+      </Suspense>
     </main>
   );
 }
