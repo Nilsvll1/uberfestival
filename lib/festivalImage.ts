@@ -1,125 +1,198 @@
 export type FestivalImageConfig = {
   url: string;
   gradient: string;
-  mood: string;    // French / default
-  moodEn: string;  // English
-  overlayStrength: number; // 0–1, darkness of the image overlay
+  mood: string;
+  moodEn: string;
+  overlayStrength: number;
 };
 
 export function getMood(config: FestivalImageConfig, lang: "en" | "fr" = "en"): string {
   return lang === "fr" ? config.mood : config.moodEn;
 }
 
-// Each genre gets a curated Unsplash photo + a rich CSS gradient fallback.
-// The gradient shows instantly (no network), the image loads over it.
-const GENRE_CONFIGS: Record<string, FestivalImageConfig> = {
+type GenrePool = {
+  urls: string[];
+  gradient: string;
+  mood: string;
+  moodEn: string;
+  overlayStrength: number;
+};
+
+function u(id: string) {
+  return `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=75`;
+}
+
+const GENRE_POOLS: Record<string, GenrePool> = {
   Electronic: {
-    url: "https://images.unsplash.com/photo-1571266028243-e4733b0f0bb0?auto=format&fit=crop&w=900&q=75",
+    urls: [
+      u("photo-1598387993441-a364f854c3e1"),
+      u("photo-1536440136628-849c177e76a1"),
+      u("photo-1563841930606-67e2bce48b78"),
+      u("photo-1470225620780-dba8ba36b745"),
+    ],
     gradient: "linear-gradient(160deg, #0f0c29 0%, #302b63 60%, #24243e 100%)",
     mood: "Immersif · Hypnotique · Électrique",
     moodEn: "Immersive · Hypnotic · Electric",
     overlayStrength: 0.55,
   },
   Techno: {
-    url: "https://images.unsplash.com/photo-1542479748-f71e573da5df?auto=format&fit=crop&w=900&q=75",
+    urls: [
+      u("photo-1529973625058-a665431328fb"),
+      u("photo-1478720568477-152d9b164e26"),
+      u("photo-1524650359799-842906ca1c06"),
+    ],
     gradient: "linear-gradient(160deg, #0a0a0a 0%, #1a0a30 60%, #0a1030 100%)",
     mood: "Sombre · Pulsant · Sans frontières",
     moodEn: "Dark · Pulsing · Borderless",
     overlayStrength: 0.7,
   },
   Jazz: {
-    url: "https://images.unsplash.com/photo-1415201364774-f6f0bb35f28f?auto=format&fit=crop&w=900&q=75",
+    urls: [
+      u("photo-1415201364774-f6f0bb35f28f"),
+      u("photo-1528360983277-13d401cdc186"),
+      u("photo-1467810563316-b5476525c0f9"),
+    ],
     gradient: "linear-gradient(160deg, #1a0a00 0%, #5C2E00 55%, #8B6914 100%)",
     mood: "Soulful · Vivant · Intemporel",
     moodEn: "Soulful · Live · Timeless",
     overlayStrength: 0.5,
   },
   Rock: {
-    url: "https://images.unsplash.com/photo-1504891939695-fb0ebaf1b39a?auto=format&fit=crop&w=900&q=75",
+    urls: [
+      u("photo-1458560871784-56d23406c091"),
+      u("photo-1501386761578-eac5c94b800a"),
+      u("photo-1526142684086-7ebd69df27a5"),
+      u("photo-1489599849927-2ee91cede3ba"),
+    ],
     gradient: "linear-gradient(160deg, #1a0010 0%, #6B0000 60%, #200122 100%)",
     mood: "Brut · Fort · Inoubliable",
     moodEn: "Raw · Loud · Unforgettable",
     overlayStrength: 0.6,
   },
   Metal: {
-    url: "https://images.unsplash.com/photo-1493676304819-0d7a8d026dcf?auto=format&fit=crop&w=900&q=75",
+    urls: [
+      u("photo-1493676304819-0d7a8d026dcf"),
+      u("photo-1458560871784-56d23406c091"),
+      u("photo-1499364615650-ec38552f4f34"),
+    ],
     gradient: "linear-gradient(160deg, #0a0a0a 0%, #1a1010 100%)",
     mood: "Intense · Cathartique · Sans compromis",
     moodEn: "Intense · Cathartic · Uncompromising",
     overlayStrength: 0.7,
   },
   Classical: {
-    url: "https://images.unsplash.com/photo-1507838153414-b4b713384a76?auto=format&fit=crop&w=900&q=75",
+    urls: [
+      u("photo-1507838153414-b4b713384a76"),
+      u("photo-1484755560615-a4c64e778a6c"),
+    ],
     gradient: "linear-gradient(160deg, #0f2027 0%, #203a43 55%, #2c5364 100%)",
     mood: "Précision · Émotion · Beauté pure",
     moodEn: "Precision · Emotion · Pure beauty",
     overlayStrength: 0.45,
   },
   Folk: {
-    url: "https://images.unsplash.com/photo-1510915361894-db8b60106cb1?auto=format&fit=crop&w=900&q=75",
+    urls: [
+      u("photo-1510915361894-db8b60106cb1"),
+      u("photo-1499364615650-ec38552f4f34"),
+      u("photo-1493225457124-a3eb161ffa5f"),
+    ],
     gradient: "linear-gradient(160deg, #1a2a10 0%, #2d5016 55%, #4a7c3f 100%)",
     mood: "Ancré · Sincère · Humain",
     moodEn: "Rooted · Honest · Human",
     overlayStrength: 0.5,
   },
   Pop: {
-    url: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=900&q=75",
+    urls: [
+      u("photo-1493225457124-a3eb161ffa5f"),
+      u("photo-1541339907198-e08756dedf3f"),
+      u("photo-1526142684086-7ebd69df27a5"),
+    ],
     gradient: "linear-gradient(160deg, #200050 0%, #6f00d2 55%, #d400d4 100%)",
     mood: "Accrocheur · Lumineux · Contagieux",
     moodEn: "Catchy · Bright · Infectious",
     overlayStrength: 0.5,
   },
   "Hip-Hop": {
-    url: "https://images.unsplash.com/photo-1571935441005-ea44068c2bf3?auto=format&fit=crop&w=900&q=75",
+    urls: [
+      u("photo-1568702846914-96b305d2aaeb"),
+      u("photo-1553361371-9b22f78e8b1d"),
+      u("photo-1489599849927-2ee91cede3ba"),
+    ],
     gradient: "linear-gradient(160deg, #0a0a0a 0%, #1a1a1a 55%, #2a2a2a 100%)",
     mood: "Culture · Flow · Authenticité",
     moodEn: "Culture · Flow · Authenticity",
     overlayStrength: 0.65,
   },
   Rap: {
-    url: "https://images.unsplash.com/photo-1571935441005-ea44068c2bf3?auto=format&fit=crop&w=900&q=75",
+    urls: [
+      u("photo-1568702846914-96b305d2aaeb"),
+      u("photo-1553361371-9b22f78e8b1d"),
+    ],
     gradient: "linear-gradient(160deg, #0a0a0a 0%, #1a1a2e 100%)",
     mood: "Texte · Énergie · Vérité",
     moodEn: "Lyrics · Energy · Truth",
     overlayStrength: 0.65,
   },
   "R&B": {
-    url: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=900&q=75",
+    urls: [
+      u("photo-1516450360452-9312f5e86fc7"),
+      u("photo-1524650359799-842906ca1c06"),
+      u("photo-1467810563316-b5476525c0f9"),
+    ],
     gradient: "linear-gradient(160deg, #1a0030 0%, #4a0060 55%, #7B0080 100%)",
     mood: "Velouté · Profond · Enveloppant",
     moodEn: "Silky · Deep · Enveloping",
     overlayStrength: 0.5,
   },
   Reggae: {
-    url: "https://images.unsplash.com/photo-1505236858219-8359eb29e329?auto=format&fit=crop&w=900&q=75",
+    urls: [
+      u("photo-1505236858219-8359eb29e329"),
+      u("photo-1533928298208-27ff66555d8d"),
+    ],
     gradient: "linear-gradient(160deg, #004000 0%, #006600 55%, #c8a000 100%)",
     mood: "Racines · Vibration · Liberté",
     moodEn: "Roots · Vibration · Freedom",
     overlayStrength: 0.45,
   },
   "World Music": {
-    url: "https://images.unsplash.com/photo-1533928298208-27ff66555d8d?auto=format&fit=crop&w=900&q=75",
+    urls: [
+      u("photo-1533928298208-27ff66555d8d"),
+      u("photo-1528360983277-13d401cdc186"),
+      u("photo-1516450360452-9312f5e86fc7"),
+    ],
     gradient: "linear-gradient(160deg, #1a0a00 0%, #8B1A4A 55%, #2c1654 100%)",
     mood: "Global · Riche · Vivant",
     moodEn: "Global · Rich · Alive",
     overlayStrength: 0.5,
   },
   "Musique du monde": {
-    url: "https://images.unsplash.com/photo-1533928298208-27ff66555d8d?auto=format&fit=crop&w=900&q=75",
+    urls: [
+      u("photo-1533928298208-27ff66555d8d"),
+      u("photo-1516450360452-9312f5e86fc7"),
+    ],
     gradient: "linear-gradient(160deg, #1a0a00 0%, #8B1A4A 55%, #2c1654 100%)",
     mood: "Global · Riche · Vivant",
     moodEn: "Global · Rich · Alive",
     overlayStrength: 0.5,
   },
   "Multi-Genre": {
-    url: "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?auto=format&fit=crop&w=900&q=75",
+    urls: [
+      u("photo-1540039155733-5bb30b53aa14"),
+      u("photo-1541339907198-e08756dedf3f"),
+      u("photo-1598387993441-a364f854c3e1"),
+      u("photo-1501386761578-eac5c94b800a"),
+    ],
     gradient: "linear-gradient(160deg, #1a1060 0%, #4a0060 40%, #9B1060 100%)",
     mood: "Éclectique · Ouvert · Festif",
     moodEn: "Eclectic · Open · Festive",
     overlayStrength: 0.5,
   },
   Country: {
-    url: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?auto=format&fit=crop&w=900&q=75",
+    urls: [
+      u("photo-1459749411175-04bf5292ceea"),
+      u("photo-1499364615650-ec38552f4f34"),
+      u("photo-1510915361894-db8b60106cb1"),
+    ],
     gradient: "linear-gradient(160deg, #2a1500 0%, #6B3500 55%, #c87000 100%)",
     mood: "Racines · Chaleur · Communauté",
     moodEn: "Roots · Warmth · Community",
@@ -127,24 +200,44 @@ const GENRE_CONFIGS: Record<string, FestivalImageConfig> = {
   },
 };
 
-const DEFAULT_CONFIG: FestivalImageConfig = {
-  url: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=900&q=75",
+const DEFAULT_POOL: GenrePool = {
+  urls: [
+    u("photo-1470229722913-7c0e2dbbafd3"),
+    u("photo-1526142684086-7ebd69df27a5"),
+    u("photo-1489599849927-2ee91cede3ba"),
+    u("photo-1501386761578-eac5c94b800a"),
+  ],
   gradient: "linear-gradient(160deg, #1a1a2e 0%, #16213e 55%, #0f3460 100%)",
   mood: "Art · Son · Communauté",
   moodEn: "Art · Sound · Community",
   overlayStrength: 0.55,
 };
 
-export function getFestivalImage(genre: string | null | undefined): FestivalImageConfig {
-  if (!genre) return DEFAULT_CONFIG;
-  if (GENRE_CONFIGS[genre]) return GENRE_CONFIGS[genre];
+function resolvePool(genre: string | null | undefined): GenrePool {
+  if (!genre) return DEFAULT_POOL;
+  if (GENRE_POOLS[genre]) return GENRE_POOLS[genre];
   const lower = genre.toLowerCase();
-  for (const [key, config] of Object.entries(GENRE_CONFIGS)) {
+  for (const [key, pool] of Object.entries(GENRE_POOLS)) {
     if (lower.includes(key.toLowerCase()) || key.toLowerCase().includes(lower)) {
-      return config;
+      return pool;
     }
   }
-  return DEFAULT_CONFIG;
+  return DEFAULT_POOL;
+}
+
+export function getFestivalImage(
+  genre: string | null | undefined,
+  id?: number
+): FestivalImageConfig {
+  const pool = resolvePool(genre);
+  const idx = id !== undefined ? id % pool.urls.length : 0;
+  return {
+    url: pool.urls[idx],
+    gradient: pool.gradient,
+    mood: pool.mood,
+    moodEn: pool.moodEn,
+    overlayStrength: pool.overlayStrength,
+  };
 }
 
 export function getAtmosphericText(
@@ -180,7 +273,6 @@ export function getAtmosphericText(
     return `Chaque année, ${place} ouvre ses portes aux artistes qui ont quelque chose à prouver. Ce festival cherche des voix singulières — celles qui font que le public repart différent de ce qu'il était en arrivant.`;
   }
 
-  // English
   if (lc.includes("electronic") || lc.includes("techno") || lc.includes("edm"))
     return `${place} goes deep into the night. This festival wants artists who can turn a room into a shared journey — where sound becomes architecture and the floor disappears beneath you.`;
   if (lc.includes("jazz"))

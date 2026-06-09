@@ -1,17 +1,32 @@
 "use client";
 
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { useRouter } from "next/navigation";
+import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
 import L from "leaflet";
 import type { Festival } from "../../lib/types";
-import { formatDeadline, genreColor } from "../../lib/utils";
+import { genreColor } from "../../lib/utils";
 
+// Suppress Leaflet's default icon URL resolution (not needed with divIcon)
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "/leaflet/marker-icon-2x.png",
-  iconUrl: "/leaflet/marker-icon.png",
-  shadowUrl: "/leaflet/marker-shadow.png",
-});
+function createMarkerIcon(accentColor: string, isHovered = false) {
+  const size = isHovered ? 20 : 16;
+  const offset = size / 2;
+  return L.divIcon({
+    html: `<div class="festival-pin" style="
+      width: ${size}px;
+      height: ${size}px;
+      border-radius: 50%;
+      background: ${accentColor};
+      border: 2.5px solid #ffffff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.24), 0 0 0 0.5px rgba(0,0,0,0.08);
+      cursor: pointer;
+    "></div>`,
+    className: "",
+    iconSize: [size, size],
+    iconAnchor: [offset, offset],
+  });
+}
 
 export default function FestivalMap({
   festivals,
@@ -24,93 +39,59 @@ export default function FestivalMap({
   zoom?: number;
   scrollWheelZoom?: boolean;
 }) {
+  const router = useRouter();
+
   return (
     <MapContainer
       center={center}
       zoom={zoom}
       scrollWheelZoom={scrollWheelZoom}
       style={{ height: "100%", width: "100%" }}
+      zoomAnimation
+      fadeAnimation
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
       />
 
       {festivals.map((festival) => {
         if (!festival.latitude || !festival.longitude) return null;
 
-        const deadline = formatDeadline(festival.submission_deadline);
         const color = festival.category ? genreColor(festival.category) : null;
+        const accentColor = color?.text ?? "#6366F1";
+        const icon = createMarkerIcon(accentColor);
 
         return (
           <Marker
             key={festival.id}
             position={[festival.latitude, festival.longitude]}
+            icon={icon}
+            eventHandlers={{
+              click: () => router.push(`/festival/${festival.id}`),
+              mouseover: (e) => {
+                e.target.setIcon(createMarkerIcon(accentColor, true));
+              },
+              mouseout: (e) => {
+                e.target.setIcon(createMarkerIcon(accentColor, false));
+              },
+            }}
           >
-            <Popup>
-              <div style={{ minWidth: "200px", fontFamily: "system-ui, sans-serif" }}>
-                {color && festival.category && (
-                  <span
-                    style={{
-                      display: "inline-block",
-                      fontSize: "11px",
-                      fontWeight: 500,
-                      padding: "2px 8px",
-                      borderRadius: "999px",
-                      background: color.bg,
-                      color: color.text,
-                      marginBottom: "8px",
-                    }}
-                  >
-                    {festival.category}
-                  </span>
-                )}
-                <p style={{ fontWeight: 600, fontSize: "14px", margin: "0 0 2px" }}>
-                  {festival.festival_name}
-                </p>
-                <p style={{ fontSize: "12px", color: "#6B7280", margin: "0 0 8px" }}>
+            <Tooltip
+              direction="top"
+              offset={[0, -10]}
+              opacity={1}
+              className="festival-tooltip"
+            >
+              <span className="festival-tooltip-name">
+                {festival.festival_name}
+              </span>
+              {(festival.city || festival.country) && (
+                <span className="festival-tooltip-location">
                   {[festival.city, festival.country].filter(Boolean).join(", ")}
-                </p>
-                {deadline && (
-                  <p
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: 500,
-                      color:
-                        deadline.status === "urgent"
-                          ? "#DC2626"
-                          : deadline.status === "soon"
-                          ? "#D97706"
-                          : deadline.status === "expired"
-                          ? "#A3A3A3"
-                          : "#059669",
-                      margin: "0 0 8px",
-                    }}
-                  >
-                    {deadline.label}
-                  </p>
-                )}
-                {festival.application_url && (
-                  <a
-                    href={festival.application_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: "inline-block",
-                      fontSize: "12px",
-                      fontWeight: 500,
-                      color: "#fff",
-                      background: "#6366F1",
-                      padding: "4px 12px",
-                      borderRadius: "6px",
-                      textDecoration: "none",
-                    }}
-                  >
-                    Postuler →
-                  </a>
-                )}
-              </div>
-            </Popup>
+                </span>
+              )}
+            </Tooltip>
           </Marker>
         );
       })}

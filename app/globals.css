@@ -20,13 +20,9 @@
   --shadow-md:   0 4px 8px rgba(0,0,0,0.06),  0 2px 4px rgba(0,0,0,0.04);
   --shadow-lg:   0 12px 32px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.04);
   --shadow-card-hover:
-    0 16px 40px -8px rgba(0,0,0,0.14),
-    0 4px 12px -4px rgba(0,0,0,0.07),
-    0 0 0 1px rgba(0,0,0,0.06);
-
-  /* Panel glass */
-  --panel-bg:     rgba(248, 248, 250, 0.96);
-  --panel-blur:   blur(24px) saturate(180%);
+    0 12px 32px -6px rgba(0,0,0,0.13),
+    0 4px 10px -4px rgba(0,0,0,0.06),
+    0 0 0 1px rgba(0,0,0,0.055);
 }
 
 @theme inline {
@@ -39,7 +35,6 @@
 /* ─── Base ─────────────────────────────────────────────────── */
 html, body { height: 100%; }
 
-/* Subtle depth gradient baked into page background */
 html {
   background:
     radial-gradient(ellipse 80% 50% at 65% -5%,  rgba(99,102,241,0.06)  0%, transparent 60%),
@@ -60,109 +55,111 @@ body {
 ::-webkit-scrollbar-thumb  { background: rgba(0,0,0,0.13); border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.22); }
 
-/* ─── Card premium hover ────────────────────────────────────── */
+/* ─── Card — premium hover ──────────────────────────────────── */
 .festival-card {
   border-color: var(--border);
+  will-change: transform;
   transition:
-    transform    260ms cubic-bezier(0.34, 1.40, 0.64, 1),
-    box-shadow   260ms cubic-bezier(0.4,  0,    0.2,  1),
-    border-color 200ms cubic-bezier(0.4,  0,    0.2,  1);
+    transform    320ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow   320ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 220ms ease;
 }
 .festival-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-3px);
   box-shadow: var(--shadow-card-hover);
-  border-color: rgba(0,0,0,0.09);
+  border-color: rgba(0,0,0,0.08);
+}
+.festival-card:active {
+  transform: translateY(-1px);
+  transition-duration: 80ms;
 }
 
 /* Image zoom on card hover */
 .card-img {
-  transition: transform 700ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: transform;
 }
 .festival-card:hover .card-img {
-  transform: scale(1.06);
-}
-
-/* ─── Hero image entrance ───────────────────────────────────── */
-@keyframes heroZoom {
-  from { transform: scale(1.06); opacity: 0.85; }
-  to   { transform: scale(1);    opacity: 1;    }
-}
-.hero-img {
-  animation: heroZoom 1.4s cubic-bezier(0.4, 0, 0.2, 1) both;
-}
-
-/* ─── Hero text entrance ────────────────────────────────────── */
-@keyframes heroReveal {
-  from { opacity: 0; transform: translateY(24px); }
-  to   { opacity: 1; transform: translateY(0);    }
-}
-.hero-title {
-  animation: heroReveal 800ms cubic-bezier(0.4, 0, 0.2, 1) 200ms both;
-}
-.hero-meta {
-  animation: heroReveal 800ms cubic-bezier(0.4, 0, 0.2, 1) 100ms both;
-}
-.hero-cta {
-  animation: heroReveal 800ms cubic-bezier(0.4, 0, 0.2, 1) 350ms both;
+  transform: scale(1.05);
 }
 
 /* ─── Stagger fade-up ───────────────────────────────────────── */
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0);    }
 }
 .animate-fadeup {
-  animation: fadeUp 380ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation: fadeUp 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ─── Hero image entrance ───────────────────────────────────── */
+@keyframes heroZoom {
+  from { transform: scale(1.04); opacity: 0.9; }
+  to   { transform: scale(1);    opacity: 1;   }
+}
+.hero-img {
+  animation: heroZoom 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+/* ─── Hero text entrance ────────────────────────────────────── */
+@keyframes heroReveal {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+.hero-meta  { animation: heroReveal 700ms cubic-bezier(0.22, 1, 0.36, 1)  80ms both; }
+.hero-title { animation: heroReveal 700ms cubic-bezier(0.22, 1, 0.36, 1) 180ms both; }
+.hero-cta   { animation: heroReveal 700ms cubic-bezier(0.22, 1, 0.36, 1) 310ms both; }
+
+/* ─── Page enter ────────────────────────────────────────────── */
+@keyframes pageEnter {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.page-enter {
+  animation: pageEnter 280ms ease both;
 }
 
 /* ─── Primary CTA ───────────────────────────────────────────── */
 .btn-cta {
   background: linear-gradient(180deg, #7577F9 0%, #6366F1 48%, #5254E8 100%);
   box-shadow:
-    0 1px 2px  rgba(0,0,0,0.20),
+    0 1px 2px  rgba(0,0,0,0.18),
     inset 0 1px 0 rgba(255,255,255,0.14);
   transition:
-    transform  140ms cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 140ms cubic-bezier(0.4, 0, 0.2, 1);
+    transform  120ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 120ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity    120ms ease;
   color: #fff;
 }
 .btn-cta:hover {
   transform: translateY(-1px);
   box-shadow:
-    0 6px 22px rgba(99,102,241,0.40),
-    0 1px 3px  rgba(0,0,0,0.18),
+    0 6px 20px rgba(99,102,241,0.38),
+    0 1px 3px  rgba(0,0,0,0.16),
     inset 0 1px 0 rgba(255,255,255,0.14);
 }
 .btn-cta:active {
   transform: translateY(0);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.18);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.16);
+  transition-duration: 60ms;
 }
 
 /* ─── Ghost nav button ──────────────────────────────────────── */
 .btn-ghost {
   font-size: 13px;
   color: var(--text-muted);
-  transition: color 150ms;
+  transition: color 140ms ease;
 }
 .btn-ghost:hover { color: var(--text-secondary); }
 
 /* ─── Dropdown animation ────────────────────────────────────── */
 @keyframes dropdown-open {
-  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  from { opacity: 0; transform: translateY(-5px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0)    scale(1);    }
 }
 .dropdown-content {
-  animation: dropdown-open 140ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation: dropdown-open 130ms cubic-bezier(0.22, 1, 0.36, 1) both;
   transform-origin: top left;
-}
-
-/* ─── Urgency pulse — < 7 day deadlines ────────────────────── */
-@keyframes urgencyPulse {
-  0%, 100% { opacity: 1; transform: scale(1);    }
-  50%       { opacity: 0.4; transform: scale(1.5); }
-}
-.urgency-dot {
-  animation: urgencyPulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 /* ─── Input focus ───────────────────────────────────────────── */
@@ -171,8 +168,66 @@ body {
   border-color: var(--accent) !important;
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
+.input-search::-webkit-search-cancel-button { display: none; }
 
-/* ─── Leaflet overrides ─────────────────────────────────────── */
+/* ─── Urgency pulse — < 7 day deadlines ────────────────────── */
+@keyframes urgencyPulse {
+  0%, 100% { opacity: 1;   transform: scale(1);   }
+  50%       { opacity: 0.4; transform: scale(1.6); }
+}
+.urgency-dot {
+  animation: urgencyPulse 1.8s ease-in-out infinite;
+}
+
+/* ─── Map skeleton shimmer ──────────────────────────────────── */
+@keyframes shimmerSweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%);  }
+}
+.map-skeleton-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255,255,255,0.40) 50%,
+    transparent 70%
+  );
+  animation: shimmerSweep 2s ease-in-out infinite;
+}
+
+/* ─── Leaflet custom tooltip ────────────────────────────────── */
+.festival-tooltip.leaflet-tooltip {
+  background: rgba(255,255,255,0.97) !important;
+  border: none !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.11), 0 0 0 1px rgba(0,0,0,0.06) !important;
+  padding: 7px 12px !important;
+  pointer-events: none;
+}
+.festival-tooltip.leaflet-tooltip::before {
+  display: none !important;
+}
+.festival-tooltip-name {
+  display: block;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #09090B;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.festival-tooltip-location {
+  display: block;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-size: 11px;
+  color: #70707B;
+  font-weight: 400;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+/* ─── Leaflet general overrides ─────────────────────────────── */
 .leaflet-popup-content-wrapper {
   border-radius: 14px !important;
   box-shadow: 0 8px 28px rgba(0,0,0,0.11), 0 0 0 1px rgba(0,0,0,0.06) !important;
@@ -202,6 +257,12 @@ body {
 .leaflet-attribution-flag           { display: none !important; }
 .leaflet-container {
   font-family: var(--font-geist-sans), system-ui, sans-serif !important;
+  cursor: default !important;
+}
+/* Make markers feel interactive */
+.festival-pin {
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 180ms ease;
 }
 
 @import "leaflet/dist/leaflet.css";

@@ -39,7 +39,7 @@ export default async function FestivalPage({
 
   const deadline  = formatDeadline(festival.submission_deadline, lang);
   const color     = festival.category ? genreColor(festival.category) : null;
-  const image     = getFestivalImage(festival.category);
+  const image     = getFestivalImage(festival.category, festival.id);
   const mood      = getMood(image, lang);
   const atmText   = getAtmosphericText(festival.category, festival.city, festival.country, lang);
 
@@ -56,7 +56,7 @@ export default async function FestivalPage({
                                       "#16A34A";
 
   return (
-    <main>
+    <main className="page-enter">
 
       {/* ╔════════════════════════════════════════════════════╗
           ║  HERO — full-bleed cinematic image                 ║

@@ -25,7 +25,7 @@ export default function FestivalCard({
   const t        = getTranslations(lang);
   const deadline = formatDeadline(festival.submission_deadline, lang);
   const color    = festival.category ? genreColor(festival.category) : null;
-  const image    = getFestivalImage(festival.category);
+  const image    = getFestivalImage(festival.category, festival.id);
   const isUrgent = deadline?.status === "urgent";
 
   return (

@@ -30,10 +30,8 @@ export default async function Home() {
   }
 
   return (
-    <main className="flex-1 overflow-hidden">
-      <Suspense fallback={<div className="flex-1 animate-pulse" style={{ background: "#EAEAEC" }} />}>
-        <SearchableFestivals festivals={data || []} />
-      </Suspense>
+    <main className="flex-1 overflow-hidden page-enter">
+      <SearchableFestivals festivals={data || []} />
     </main>
   );
 }
