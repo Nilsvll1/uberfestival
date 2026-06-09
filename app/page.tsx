@@ -30,15 +30,8 @@ export default async function Home() {
   }
 
   return (
-    <main className="max-w-screen-xl mx-auto px-6 py-6">
-      <Suspense
-        fallback={
-          <div
-            className="h-[60vh] w-full rounded-2xl border animate-pulse"
-            style={{ background: "#fff", borderColor: "var(--border)" }}
-          />
-        }
-      >
+    <main className="flex-1 overflow-hidden">
+      <Suspense fallback={<div className="flex-1 animate-pulse" style={{ background: "#EAEAEC" }} />}>
         <SearchableFestivals festivals={data || []} />
       </Suspense>
     </main>

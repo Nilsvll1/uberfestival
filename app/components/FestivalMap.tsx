@@ -13,12 +13,22 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "/leaflet/marker-shadow.png",
 });
 
-export default function FestivalMap({ festivals }: { festivals: Festival[] }) {
+export default function FestivalMap({
+  festivals,
+  center = [20, 0],
+  zoom = 2,
+  scrollWheelZoom = true,
+}: {
+  festivals: Festival[];
+  center?: [number, number];
+  zoom?: number;
+  scrollWheelZoom?: boolean;
+}) {
   return (
     <MapContainer
-      center={[20, 0]}
-      zoom={2}
-      scrollWheelZoom={true}
+      center={center}
+      zoom={zoom}
+      scrollWheelZoom={scrollWheelZoom}
       style={{ height: "100%", width: "100%" }}
     >
       <TileLayer
