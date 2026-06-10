@@ -1,9 +1,18 @@
 import type { Language } from "../../lib/i18n";
+import { getTranslations } from "../../lib/i18n";
+import { createClient } from "../../lib/supabase-server";
 import LanguageSwitcher from "./LanguageSwitcher";
 import MotionHeader from "./MotionHeader";
 import LogoBrandmark from "./LogoBrandmark";
+import UserMenu from "./UserMenu";
 
-export default function Header({ lang }: { lang: Language }) {
+export default async function Header({ lang }: { lang: Language }) {
+  const t = getTranslations(lang);
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
     <MotionHeader
       className="sticky top-0 z-50 h-[52px] border-b"
@@ -20,20 +29,31 @@ export default function Header({ lang }: { lang: Language }) {
         <div className="flex-1" />
 
         <nav className="flex items-center gap-2">
-          <span
-            className="font-semibold uppercase tracking-wider"
-            style={{
-              fontSize: "9.5px",
-              letterSpacing: "0.06em",
-              padding: "3px 7px",
-              borderRadius: "5px",
-              background: "rgba(99,102,241,0.08)",
-              color: "var(--accent)",
-            }}
-          >
-            Beta
-          </span>
+          {/* Submit a festival — only show when logged out to keep header clean */}
+          {!user && (
+            <a
+              href="mailto:submit@uberfestival.com?subject=Festival%20Submission"
+              className="btn-nav-submit hidden sm:inline-flex items-center gap-1.5"
+            >
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 12 12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M2 2.5h8M2 5.5h5.5M2 8.5h7" />
+              </svg>
+              {t.nav.submit}
+            </a>
+          )}
+
           <LanguageSwitcher />
+          <UserMenu user={user} />
         </nav>
       </div>
     </MotionHeader>

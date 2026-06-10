@@ -25,11 +25,9 @@ const itemVariants = {
 type SortKey = "deadline" | "name";
 type UrgencyTab = "all" | "week" | "month";
 
-const TODAY_ISO = new Date().toISOString().slice(0, 10);
-
 const URGENCY_ORDER: UrgencyGroup[] = ["this-week", "this-month", "upcoming", "no-deadline", "expired"];
 
-function sortFestivals(festivals: Festival[], sort: SortKey): Festival[] {
+function sortFestivals(festivals: Festival[], sort: SortKey, today: string): Festival[] {
   if (sort === "name")
     return [...festivals].sort((a, b) => a.festival_name.localeCompare(b.festival_name));
   return [...festivals].sort((a, b) => {
@@ -38,14 +36,24 @@ function sortFestivals(festivals: Festival[], sort: SortKey): Festival[] {
     if (!da && !db) return 0;
     if (!da) return 1;
     if (!db) return -1;
-    const aFuture = da >= TODAY_ISO, bFuture = db >= TODAY_ISO;
+    const aFuture = da >= today, bFuture = db >= today;
     if (aFuture && !bFuture) return -1;
     if (!aFuture && bFuture) return 1;
     return aFuture ? da.localeCompare(db) : db.localeCompare(da);
   });
 }
 
-export default function SearchableFestivals({ festivals }: { festivals: Festival[] }) {
+export default function SearchableFestivals({
+  festivals,
+  userId = null,
+  savedIds = [],
+  today,
+}: {
+  festivals: Festival[];
+  userId?: string | null;
+  today: string;
+  savedIds?: number[];
+}) {
   const { lang, t } = useI18n();
   const h = t.home;
 
@@ -78,37 +86,37 @@ export default function SearchableFestivals({ festivals }: { festivals: Festival
   }), [festivals, query, country, category]);
 
   // Tab counts (reflect base filters so users see relevant counts)
-  const weekCount  = useMemo(() => baseFiltered.filter(f => getUrgencyGroup(f.submission_deadline) === "this-week").length, [baseFiltered]);
+  const weekCount  = useMemo(() => baseFiltered.filter(f => getUrgencyGroup(f.submission_deadline, today) === "this-week").length, [baseFiltered, today]);
   const monthCount = useMemo(() => baseFiltered.filter(f => {
-    const g = getUrgencyGroup(f.submission_deadline);
+    const g = getUrgencyGroup(f.submission_deadline, today);
     return g === "this-week" || g === "this-month";
-  }).length, [baseFiltered]);
+  }).length, [baseFiltered, today]);
 
   // Final filtered list — applies urgency tab on top of base
   const filtered = useMemo(() => {
     let base = baseFiltered;
     if (urgencyTab === "week") {
-      base = base.filter(f => getUrgencyGroup(f.submission_deadline) === "this-week");
+      base = base.filter(f => getUrgencyGroup(f.submission_deadline, today) === "this-week");
     } else if (urgencyTab === "month") {
       base = base.filter(f => {
-        const g = getUrgencyGroup(f.submission_deadline);
+        const g = getUrgencyGroup(f.submission_deadline, today);
         return g === "this-week" || g === "this-month";
       });
     }
-    return sortFestivals(base, sort);
-  }, [baseFiltered, urgencyTab, sort]);
+    return sortFestivals(base, sort, today);
+  }, [baseFiltered, urgencyTab, sort, today]);
 
   // Groups for the "all" tab grouped view (only when sort === "deadline")
   const groups = useMemo(() => {
     if (urgencyTab !== "all" || sort !== "deadline") return null;
     const map = new Map<UrgencyGroup, Festival[]>();
     for (const f of filtered) {
-      const g = getUrgencyGroup(f.submission_deadline);
+      const g = getUrgencyGroup(f.submission_deadline, today);
       if (!map.has(g)) map.set(g, []);
       map.get(g)!.push(f);
     }
     return URGENCY_ORDER.filter(g => map.has(g)).map(g => ({ key: g, items: map.get(g)! }));
-  }, [filtered, urgencyTab, sort]);
+  }, [filtered, urgencyTab, sort, today]);
 
   const hasFilters = query.trim() !== "" || country !== "" || category !== "" || urgencyTab !== "all";
 
@@ -449,6 +457,8 @@ export default function SearchableFestivals({ festivals }: { festivals: Festival
                               lang={lang}
                               isActive={hoveredId === festival.id}
                               isDimmed={hasSomeHover && hoveredId !== festival.id}
+                              userId={userId}
+                              initialSaved={savedIds.includes(festival.id)}
                             />
                           </motion.li>
                         ))}
@@ -473,6 +483,8 @@ export default function SearchableFestivals({ festivals }: { festivals: Festival
                           lang={lang}
                           isActive={hoveredId === festival.id}
                           isDimmed={hasSomeHover && hoveredId !== festival.id}
+                          userId={userId}
+                          initialSaved={savedIds.includes(festival.id)}
                         />
                       </motion.li>
                     ))
@@ -616,7 +628,13 @@ export default function SearchableFestivals({ festivals }: { festivals: Festival
             >
               {filtered.map((festival, index) => (
                 <motion.li key={festival.id} variants={itemVariants}>
-                  <FestivalCard festival={festival} index={index} lang={lang} />
+                  <FestivalCard
+                    festival={festival}
+                    index={index}
+                    lang={lang}
+                    userId={userId}
+                    initialSaved={savedIds.includes(festival.id)}
+                  />
                 </motion.li>
               ))}
             </motion.ul>

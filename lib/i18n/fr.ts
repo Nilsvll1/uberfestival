@@ -2,12 +2,12 @@ import type { Translations } from "./types";
 
 export const fr: Translations = {
   nav: {
-    submit: "Soumettre",
+    submit: "Soumettre un festival",
     login: "Connexion",
   },
   home: {
-    platform: "Appels ouverts pour les artistes du monde entier",
-    tagline: ["Ta prochaine opportunité", "commence ici."],
+    platform: "Opportunités de festivals pour les professionnels de la musique",
+    tagline: ["Ta prochaine opportunité", "de carrière commence ici."],
     live: "En direct",
     openCalls: (n) => `${n} appel${n !== 1 ? "s" : ""} ouvert${n !== 1 ? "s" : ""}`,
     countStats: (festivals, countries) =>
@@ -72,5 +72,8 @@ export const fr: Translations = {
     urgent: (n) => `dans ${n} jour${n !== 1 ? "s" : ""}`,
     inDays: (n) => `dans ${n} jours`,
     inMonths: (n) => `dans ${n} mois`,
+  },
+  error: {
+    connection: "Erreur de connexion à la base de données.",
   },
 };

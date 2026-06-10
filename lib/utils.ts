@@ -6,12 +6,17 @@ export type DeadlineStatus = "ok" | "soon" | "urgent" | "expired";
 /* ── Urgency grouping ──────────────────────────────────────── */
 export type UrgencyGroup = "this-week" | "this-month" | "upcoming" | "no-deadline" | "expired";
 
-export function getUrgencyGroup(deadline: string | null | undefined): UrgencyGroup {
+export function getUrgencyGroup(
+  deadline: string | null | undefined,
+  today?: string
+): UrgencyGroup {
   if (!deadline) return "no-deadline";
-  const today = new Date().toISOString().slice(0, 10);
+  const todayStr = today ?? new Date().toISOString().slice(0, 10);
   const dl = deadline.slice(0, 10);
-  if (dl < today) return "expired";
-  const daysLeft = Math.round((new Date(dl).getTime() - new Date(today).getTime()) / 86400000);
+  if (dl < todayStr) return "expired";
+  const daysLeft = Math.round(
+    (new Date(dl).getTime() - new Date(todayStr).getTime()) / 86400000
+  );
   if (daysLeft <= 7)  return "this-week";
   if (daysLeft <= 30) return "this-month";
   return "upcoming";

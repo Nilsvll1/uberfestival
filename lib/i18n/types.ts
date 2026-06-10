@@ -66,4 +66,7 @@ export type Translations = {
     inDays: (n: number) => string;
     inMonths: (n: number) => string;
   };
+  error: {
+    connection: string;
+  };
 };

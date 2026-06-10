@@ -2,12 +2,12 @@ import type { Translations } from "./types";
 
 export const en: Translations = {
   nav: {
-    submit: "Submit",
+    submit: "Submit a festival",
     login: "Sign in",
   },
   home: {
-    platform: "Open calls for artists worldwide",
-    tagline: ["Your next opportunity", "starts here."],
+    platform: "Festival opportunities for music professionals",
+    tagline: ["Your next career", "opportunity starts here."],
     live: "Live",
     openCalls: (n) => `${n} open call${n !== 1 ? "s" : ""}`,
     countStats: (festivals, countries) =>
@@ -72,5 +72,8 @@ export const en: Translations = {
     urgent: (n) => `${n} day${n !== 1 ? "s" : ""} left`,
     inDays: (n) => `in ${n} days`,
     inMonths: (n) => `in ${n} month${n !== 1 ? "s" : ""}`,
+  },
+  error: {
+    connection: "Unable to connect to the database.",
   },
 };

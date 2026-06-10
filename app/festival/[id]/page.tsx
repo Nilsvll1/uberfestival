@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
-import { supabase } from "../../../lib/supabase";
+import { createClient } from "../../../lib/supabase-server";
 import FestivalMapWrapper from "../../components/FestivalMapWrapper";
 import FestivalCard from "../../components/FestivalCard";
 import DetailHero from "../../components/DetailHero";
@@ -18,6 +18,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
+  const supabase = await createClient();
   const { data } = await supabase
     .from("festivals")
     .select("festival_name, city, country, category")
@@ -51,26 +52,49 @@ export default async function FestivalPage({
 }) {
   const { id } = await params;
 
-  // Read language from cookie (same approach as layout.tsx)
   const cookieStore = await cookies();
   const rawLang = cookieStore.get(LANG_COOKIE)?.value;
   const lang = isValidLanguage(rawLang) ? rawLang : DEFAULT_LANGUAGE;
   const t = getTranslations(lang);
 
-  const { data: festival, error } = await supabase
-    .from("festivals")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const supabase = await createClient();
+
+  const [
+    { data: festival, error },
+    { data: { user } },
+  ] = await Promise.all([
+    supabase.from("festivals").select("*").eq("id", id).single(),
+    supabase.auth.getUser(),
+  ]);
 
   if (error || !festival) notFound();
 
-  const { data: related } = await supabase
-    .from("festivals")
-    .select("id, festival_name, city, country, category, application_url, submission_deadline, latitude, longitude")
-    .eq("category", festival.category)
-    .neq("id", Number(id))
-    .limit(3);
+  // Track view (fire-and-forget, don't await to avoid adding latency).
+  if (user) {
+    supabase.from("festival_views").upsert(
+      { user_id: user.id, festival_id: festival.id, viewed_at: new Date().toISOString() },
+      { onConflict: "user_id,festival_id" }
+    ).then(() => {});
+  }
+
+  const [relatedResult, savedResult] = await Promise.all([
+    supabase
+      .from("festivals")
+      .select("id, festival_name, city, country, category, application_url, submission_deadline, latitude, longitude")
+      .eq("category", festival.category)
+      .neq("id", Number(id))
+      .limit(3),
+    user
+      ? supabase
+          .from("saved_festivals")
+          .select("festival_id")
+          .eq("user_id", user.id)
+          .in("festival_id", [festival.id])
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const { data: related } = relatedResult;
+  const savedIds = (savedResult.data ?? []).map((s: { festival_id: number }) => s.festival_id);
 
   const deadline  = formatDeadline(festival.submission_deadline, lang);
   const color     = festival.category ? genreColor(festival.category) : null;
@@ -90,7 +114,37 @@ export default async function FestivalPage({
     deadline?.status === "expired" ? "var(--text-muted)"   :
                                       "#16A34A";
 
+  const jsonLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    "name": festival.festival_name,
+    "location": {
+      "@type": "Place",
+      "name": [festival.city, festival.country].filter(Boolean).join(", ") || "Location TBA",
+      "address": {
+        "@type": "PostalAddress",
+        ...(festival.city    ? { "addressLocality": festival.city }   : {}),
+        ...(festival.country ? { "addressCountry":  festival.country } : {}),
+      },
+    },
+    "eventStatus": "https://schema.org/EventScheduled",
+    "organizer": {
+      "@type": "Organization",
+      "name": "UberFestival",
+      "url": "https://uberfestival.com",
+    },
+    ...(festival.category      ? { "about": festival.category }                     : {}),
+    ...(festival.application_url ? { "url": festival.application_url }              : {}),
+    ...(festival.submission_deadline ? { "endDate": festival.submission_deadline }  : {}),
+    ...(festival.description   ? { "description": festival.description }            : {}),
+  };
+
   return (
+    <>
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+    />
     <main>
 
       {/* ╔════════════════════════════════════════════════════╗
@@ -372,7 +426,13 @@ export default async function FestivalPage({
             <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {(related as Festival[]).map((f, i) => (
                 <li key={f.id}>
-                  <FestivalCard festival={f} index={i} lang={lang} />
+                  <FestivalCard
+                    festival={f}
+                    index={i}
+                    lang={lang}
+                    userId={user?.id ?? null}
+                    initialSaved={savedIds.includes(f.id)}
+                  />
                 </li>
               ))}
             </ul>
@@ -381,6 +441,7 @@ export default async function FestivalPage({
         </ScrollReveal>
       </div>
     </main>
+    </>
   );
 }
 

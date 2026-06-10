@@ -22,12 +22,16 @@ export default function FestivalCard({
   lang = "en",
   isActive = false,
   isDimmed = false,
+  userId = null,
+  initialSaved = false,
 }: {
   festival: Festival;
   index?: number;
   lang?: Language;
   isActive?: boolean;
   isDimmed?: boolean;
+  userId?: string | null;
+  initialSaved?: boolean;
 }) {
   const t        = getTranslations(lang);
   const deadline = formatDeadline(festival.submission_deadline, lang);
@@ -94,7 +98,12 @@ export default function FestivalCard({
           color={color}
           layoutId={`festival-img-${festival.id}`}
         />
-        <SaveButton label={t.card.save} festivalId={festival.id} />
+        <SaveButton
+          label={t.card.save}
+          festivalId={festival.id}
+          userId={userId}
+          initialSaved={initialSaved}
+        />
 
         {/* Opportunity score badge — top left */}
         {score.tier !== "limited" && (
@@ -150,14 +159,24 @@ export default function FestivalCard({
           >
             {festival.festival_name}
           </Link>
-          {(festival.city || festival.country) && (
-            <p className="flex items-center gap-1 text-[11.5px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-              <svg width="9" height="9" viewBox="0 0 10 12" fill="none" className="shrink-0 opacity-60">
-                <path d="M5 0C2.79 0 1 1.79 1 4c0 3.5 4 8 4 8s4-4.5 4-8c0-2.21-1.79-4-4-4z" fill="currentColor" />
-              </svg>
-              {[festival.city, festival.country].filter(Boolean).join(", ")}
-            </p>
-          )}
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {(festival.city || festival.country) && (
+              <p className="flex items-center gap-1 text-[11.5px]" style={{ color: "var(--text-muted)" }}>
+                <svg width="9" height="9" viewBox="0 0 10 12" fill="none" className="shrink-0 opacity-60">
+                  <path d="M5 0C2.79 0 1 1.79 1 4c0 3.5 4 8 4 8s4-4.5 4-8c0-2.21-1.79-4-4-4z" fill="currentColor" />
+                </svg>
+                {[festival.city, festival.country].filter(Boolean).join(", ")}
+              </p>
+            )}
+            {color && festival.category && (
+              <span
+                className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
+                style={{ background: color.bg, color: color.text, letterSpacing: "0.01em" }}
+              >
+                {festival.category}
+              </span>
+            )}
+          </div>
         </div>
 
         <div
