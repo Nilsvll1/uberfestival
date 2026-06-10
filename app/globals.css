@@ -55,30 +55,19 @@ body {
 ::-webkit-scrollbar-thumb  { background: rgba(0,0,0,0.13); border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.22); }
 
-/* ─── Card — hover + dimming ────────────────────────────────── */
+/* ─── Card — base styles (hover handled by Framer Motion) ──── */
 .festival-card {
   border-color: var(--border);
-  will-change: transform, opacity;
-  transition:
-    transform    300ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow   300ms cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 200ms ease,
-    opacity      200ms ease;
 }
-.festival-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-card-hover) !important;
-  border-color: rgba(0,0,0,0.08) !important;
-  opacity: 1 !important;
-}
-/* Override dimmed when parent li is hovered */
 
-.card-img {
-  transition: transform 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  will-change: transform;
+/* ─── Map marker pulse ──────────────────────────────────────── */
+@keyframes markerPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(99,102,241,0.4), 0 2px 8px rgba(0,0,0,0.22); }
+  60%  { box-shadow: 0 0 0 7px rgba(99,102,241,0),  0 2px 8px rgba(0,0,0,0.22); }
+  100% { box-shadow: 0 0 0 0 rgba(99,102,241,0),    0 2px 8px rgba(0,0,0,0.22); }
 }
-.festival-card:hover .card-img {
-  transform: scale(1.05);
+.marker-pulse {
+  animation: markerPulse 1.6s ease-out infinite;
 }
 
 /* ─── Stagger fade-up ───────────────────────────────────────── */
@@ -99,23 +88,7 @@ body {
   animation: pageEnter 300ms ease both;
 }
 
-/* ─── Hero — image entrance ─────────────────────────────────── */
-@keyframes heroZoom {
-  from { transform: scale(1.04); opacity: 0.9; }
-  to   { transform: scale(1);    opacity: 1;   }
-}
-.hero-img {
-  animation: heroZoom 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
-}
-
-/* ─── Hero — text stagger ───────────────────────────────────── */
-@keyframes heroReveal {
-  from { opacity: 0; transform: translateY(18px); }
-  to   { opacity: 1; transform: translateY(0);    }
-}
-.hero-meta  { animation: heroReveal 650ms cubic-bezier(0.22, 1, 0.36, 1)  80ms both; }
-.hero-title { animation: heroReveal 650ms cubic-bezier(0.22, 1, 0.36, 1) 170ms both; }
-.hero-cta   { animation: heroReveal 650ms cubic-bezier(0.22, 1, 0.36, 1) 300ms both; }
+/* Hero image + text entrance replaced by Framer Motion in DetailHero */
 
 /* ─── Hero — frosted glass back button ─────────────────────── */
 .hero-back-btn {

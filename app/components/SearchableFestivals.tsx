@@ -1,16 +1,33 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
+import Image from "next/image";
 import type { Festival } from "../../lib/types";
+import type { UrgencyGroup } from "../../lib/utils";
+import { getUrgencyGroup } from "../../lib/utils";
 import FestivalMapWrapper from "./FestivalMapWrapper";
 import FilterDropdown from "./FilterDropdown";
 import FestivalCard from "./FestivalCard";
 import { useI18n } from "../hooks/useI18n";
 
+const listVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.04 } },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 8 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] as const } },
+};
+
 type SortKey = "deadline" | "name";
+type UrgencyTab = "all" | "week" | "month";
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
+
+const URGENCY_ORDER: UrgencyGroup[] = ["this-week", "this-month", "upcoming", "no-deadline", "expired"];
 
 function sortFestivals(festivals: Festival[], sort: SortKey): Festival[] {
   if (sort === "name")
@@ -36,11 +53,12 @@ export default function SearchableFestivals({ festivals }: { festivals: Festival
   const pathname    = usePathname();
   const searchParams = useSearchParams();
 
-  const [query,     setQuery]     = useState(() => searchParams.get("q")       ?? "");
-  const [country,   setCountry]   = useState(() => searchParams.get("country") ?? "");
-  const [category,  setCategory]  = useState(() => searchParams.get("genre")   ?? "");
-  const [sort,      setSort]      = useState<SortKey>("deadline");
-  const [hoveredId, setHoveredId] = useState<number | null>(null);
+  const [query,       setQuery]       = useState(() => searchParams.get("q")       ?? "");
+  const [country,     setCountry]     = useState(() => searchParams.get("country") ?? "");
+  const [category,    setCategory]    = useState(() => searchParams.get("genre")   ?? "");
+  const [sort,        setSort]        = useState<SortKey>("deadline");
+  const [urgencyTab,  setUrgencyTab]  = useState<UrgencyTab>("all");
+  const [hoveredId,   setHoveredId]   = useState<number | null>(null);
 
   const searchRef    = useRef<HTMLInputElement>(null);
   const mobileSearch = useRef<HTMLInputElement>(null);
@@ -51,19 +69,52 @@ export default function SearchableFestivals({ festivals }: { festivals: Festival
   const categories  = useMemo(() => [...new Set(festivals.map(f => f.category).filter(Boolean))].sort() as string[], [festivals]);
   const uniqueCountriesCount = useMemo(() => new Set(festivals.map(f => f.country).filter(Boolean)).size, [festivals]);
 
+  // Base filter (search + dropdowns, no urgency tab)
+  const baseFiltered = useMemo(() => festivals.filter(f => {
+    const matchName    = query.trim() === "" || f.festival_name.toLowerCase().includes(query.toLowerCase());
+    const matchCountry = country   === "" || f.country   === country;
+    const matchCat     = category  === "" || f.category  === category;
+    return matchName && matchCountry && matchCat;
+  }), [festivals, query, country, category]);
+
+  // Tab counts (reflect base filters so users see relevant counts)
+  const weekCount  = useMemo(() => baseFiltered.filter(f => getUrgencyGroup(f.submission_deadline) === "this-week").length, [baseFiltered]);
+  const monthCount = useMemo(() => baseFiltered.filter(f => {
+    const g = getUrgencyGroup(f.submission_deadline);
+    return g === "this-week" || g === "this-month";
+  }).length, [baseFiltered]);
+
+  // Final filtered list — applies urgency tab on top of base
   const filtered = useMemo(() => {
-    const base = festivals.filter(f => {
-      const matchName    = query.trim() === "" || f.festival_name.toLowerCase().includes(query.toLowerCase());
-      const matchCountry = country   === "" || f.country   === country;
-      const matchCat     = category  === "" || f.category  === category;
-      return matchName && matchCountry && matchCat;
-    });
+    let base = baseFiltered;
+    if (urgencyTab === "week") {
+      base = base.filter(f => getUrgencyGroup(f.submission_deadline) === "this-week");
+    } else if (urgencyTab === "month") {
+      base = base.filter(f => {
+        const g = getUrgencyGroup(f.submission_deadline);
+        return g === "this-week" || g === "this-month";
+      });
+    }
     return sortFestivals(base, sort);
-  }, [festivals, query, country, category, sort]);
+  }, [baseFiltered, urgencyTab, sort]);
 
-  const hasFilters = query.trim() !== "" || country !== "" || category !== "";
+  // Groups for the "all" tab grouped view (only when sort === "deadline")
+  const groups = useMemo(() => {
+    if (urgencyTab !== "all" || sort !== "deadline") return null;
+    const map = new Map<UrgencyGroup, Festival[]>();
+    for (const f of filtered) {
+      const g = getUrgencyGroup(f.submission_deadline);
+      if (!map.has(g)) map.set(g, []);
+      map.get(g)!.push(f);
+    }
+    return URGENCY_ORDER.filter(g => map.has(g)).map(g => ({ key: g, items: map.get(g)! }));
+  }, [filtered, urgencyTab, sort]);
 
-  const reset = useCallback(() => { setQuery(""); setCountry(""); setCategory(""); }, []);
+  const hasFilters = query.trim() !== "" || country !== "" || category !== "" || urgencyTab !== "all";
+
+  const reset = useCallback(() => {
+    setQuery(""); setCountry(""); setCategory(""); setUrgencyTab("all");
+  }, []);
 
   // "/" keyboard shortcut
   useEffect(() => {
@@ -129,7 +180,19 @@ export default function SearchableFestivals({ festivals }: { festivals: Festival
           {/* ── Panel header ─────────────────────────────────── */}
           <div className="shrink-0 px-6 pt-6 pb-5">
 
-            {/* Live indicator */}
+            {/* Full logo — hero branding */}
+            <div className="mb-5">
+              <Image
+                src="/logo-cropped.png"
+                alt="UberFestival"
+                width={176}
+                height={29}
+                priority
+                style={{ objectFit: "contain", objectPosition: "left" }}
+              />
+            </div>
+
+            {/* Live indicator + urgency alert */}
             <div className="flex items-center gap-2 mb-4">
               <span className="live-dot" aria-hidden="true" />
               <span
@@ -142,16 +205,48 @@ export default function SearchableFestivals({ festivals }: { festivals: Festival
               <span style={{ fontSize: "10px", color: "var(--text-secondary)", fontWeight: 500 }}>
                 {h.openCalls(festivals.length)}
               </span>
+              {weekCount > 0 && (
+                <>
+                  <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>·</span>
+                  <button
+                    onClick={() => setUrgencyTab("week")}
+                    className="flex items-center gap-1 transition-opacity hover:opacity-80"
+                    style={{ fontSize: "10px", color: "#DC2626", fontWeight: 600 }}
+                  >
+                    <span style={{ fontSize: 8 }}>●</span>
+                    {h.closingSoon(weekCount)}
+                  </button>
+                </>
+              )}
             </div>
 
-            {/* Tagline */}
-            <h1
-              className="font-extrabold leading-[1.04]"
-              style={{ fontSize: "28px", letterSpacing: "-0.04em", color: "var(--text-primary)" }}
-            >
-              {h.tagline[0]}<br />
-              <span style={{ color: "var(--accent)" }}>{h.tagline[1]}</span>
-            </h1>
+            {/* Tagline — static or contextual when filters active */}
+            {(() => {
+              const lines = hasFilters
+                ? h.contextTagline(filtered.length, category, country)
+                : h.tagline;
+              return (
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.h1
+                    key={hasFilters ? `ctx-${category}-${country}-${filtered.length}` : "default"}
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 5 }}
+                    transition={{ duration: 0.18, ease: "easeOut" }}
+                    className="font-extrabold leading-[1.04]"
+                    style={{ fontSize: "28px", letterSpacing: "-0.04em", color: "var(--text-primary)" }}
+                  >
+                    {lines[0]}<br />
+                    <span style={{ color: "var(--accent)" }}>{lines[1]}</span>
+                  </motion.h1>
+                </AnimatePresence>
+              );
+            })()}
+
+            {/* Platform descriptor */}
+            <p style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: 5 }}>
+              {h.platform}
+            </p>
 
             {/* Stat pills */}
             <div className="flex items-center gap-2 mt-3.5">
@@ -202,6 +297,40 @@ export default function SearchableFestivals({ festivals }: { festivals: Festival
             className="shrink-0 px-5 pb-4"
             style={{ borderBottom: "1px solid rgba(0,0,0,0.06)" }}
           >
+            {/* Urgency tabs */}
+            <div
+              className="flex items-center gap-0.5 p-1 rounded-xl mb-3"
+              style={{ background: "rgba(0,0,0,0.04)" }}
+            >
+              {(["all", "week", "month"] as UrgencyTab[]).map(tab => {
+                const label =
+                  tab === "all"   ? h.urgencyTabs.all :
+                  tab === "week"  ? h.urgencyTabs.thisWeek(weekCount) :
+                  h.urgencyTabs.thisMonth(monthCount);
+                const isHot = tab === "week" && weekCount > 0;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setUrgencyTab(tab)}
+                    className="flex-1 text-center rounded-lg transition-all"
+                    style={{
+                      fontSize: "11.5px",
+                      padding: "5px 6px",
+                      fontWeight: urgencyTab === tab ? 600 : 400,
+                      background: urgencyTab === tab ? "#fff" : "transparent",
+                      color: urgencyTab === tab
+                        ? (isHot ? "#DC2626" : "var(--text-primary)")
+                        : "var(--text-muted)",
+                      boxShadow: urgencyTab === tab ? "0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04)" : "none",
+                      transition: "background 150ms, color 150ms, box-shadow 150ms",
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
             {/* Search */}
             <div className="relative">
               <svg
@@ -244,8 +373,8 @@ export default function SearchableFestivals({ festivals }: { festivals: Festival
 
             {/* Chips + sort */}
             <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
-              <FilterDropdown label={h.country}  value={country}  options={countries}  onChange={setCountry}  />
-              <FilterDropdown label={h.genre}    value={category} options={categories} onChange={setCategory} />
+              <FilterDropdown label={h.country}  value={country}  options={countries}  onChange={setCountry}  showAllLabel={h.showAll} />
+              <FilterDropdown label={h.genre}    value={category} options={categories} onChange={setCategory} showAllLabel={h.showAll} />
               <div
                 className="flex items-center rounded-full border overflow-hidden ml-auto"
                 style={{ borderColor: "var(--border)", boxShadow: "var(--shadow-xs)" }}
@@ -275,27 +404,80 @@ export default function SearchableFestivals({ festivals }: { festivals: Festival
               {filtered.length === 0 ? (
                 <EmptyState hasFilters={hasFilters} onReset={reset} t={t.home} />
               ) : (
-                <ul className="flex flex-col gap-2.5 pb-12">
-                  {filtered.map((festival, index) => (
-                    <li
-                      key={festival.id}
-                      ref={el => {
-                        if (el) cardElRefs.current.set(festival.id, el);
-                        else cardElRefs.current.delete(festival.id);
-                      }}
-                      onMouseEnter={() => setHoveredId(festival.id)}
-                      onMouseLeave={() => setHoveredId(null)}
-                    >
-                      <FestivalCard
-                        festival={festival}
-                        index={index}
-                        lang={lang}
-                        isActive={hoveredId === festival.id}
-                        isDimmed={hasSomeHover && hoveredId !== festival.id}
-                      />
-                    </li>
-                  ))}
-                </ul>
+                <motion.ul
+                  key={`${query}-${country}-${category}-${sort}-${urgencyTab}`}
+                  className="flex flex-col gap-2.5 pb-12"
+                  variants={listVariants}
+                  initial="hidden"
+                  animate="show"
+                >
+                  {groups ? (
+                    // Grouped view: section headers + cards
+                    groups.map(group => (
+                      <React.Fragment key={group.key}>
+                        <motion.li
+                          key={`hdr-${group.key}`}
+                          variants={itemVariants}
+                          style={{ listStyle: "none" }}
+                        >
+                          <GroupHeader
+                            label={h.urgencyGroups[
+                              group.key === "this-week"  ? "thisWeek"  :
+                              group.key === "this-month" ? "thisMonth" :
+                              group.key === "upcoming"   ? "upcoming"  :
+                              group.key === "no-deadline"? "noDeadline":
+                              "expired"
+                            ]}
+                            count={group.items.length}
+                            isHot={group.key === "this-week"}
+                          />
+                        </motion.li>
+                        {group.items.map((festival, index) => (
+                          <motion.li
+                            key={festival.id}
+                            variants={itemVariants}
+                            ref={el => {
+                              if (el) cardElRefs.current.set(festival.id, el as HTMLLIElement);
+                              else cardElRefs.current.delete(festival.id);
+                            }}
+                            onMouseEnter={() => setHoveredId(festival.id)}
+                            onMouseLeave={() => setHoveredId(null)}
+                          >
+                            <FestivalCard
+                              festival={festival}
+                              index={index}
+                              lang={lang}
+                              isActive={hoveredId === festival.id}
+                              isDimmed={hasSomeHover && hoveredId !== festival.id}
+                            />
+                          </motion.li>
+                        ))}
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    // Flat view: A-Z or urgency-tab filtered
+                    filtered.map((festival, index) => (
+                      <motion.li
+                        key={festival.id}
+                        variants={itemVariants}
+                        ref={el => {
+                          if (el) cardElRefs.current.set(festival.id, el as HTMLLIElement);
+                          else cardElRefs.current.delete(festival.id);
+                        }}
+                        onMouseEnter={() => setHoveredId(festival.id)}
+                        onMouseLeave={() => setHoveredId(null)}
+                      >
+                        <FestivalCard
+                          festival={festival}
+                          index={index}
+                          lang={lang}
+                          isActive={hoveredId === festival.id}
+                          isDimmed={hasSomeHover && hoveredId !== festival.id}
+                        />
+                      </motion.li>
+                    ))
+                  )}
+                </motion.ul>
               )}
             </div>
             {/* Scroll fade */}
@@ -355,9 +537,41 @@ export default function SearchableFestivals({ festivals }: { festivals: Festival
               }}
             />
           </div>
+          {/* Urgency tabs — mobile */}
+          <div
+            className="flex items-center gap-0.5 p-1 rounded-xl mt-2"
+            style={{ background: "rgba(0,0,0,0.04)" }}
+          >
+            {(["all", "week", "month"] as UrgencyTab[]).map(tab => {
+              const label =
+                tab === "all"   ? h.urgencyTabs.all :
+                tab === "week"  ? h.urgencyTabs.thisWeek(weekCount) :
+                h.urgencyTabs.thisMonth(monthCount);
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setUrgencyTab(tab)}
+                  className="flex-1 text-center rounded-lg transition-all"
+                  style={{
+                    fontSize: "11.5px",
+                    padding: "5px 6px",
+                    fontWeight: urgencyTab === tab ? 600 : 400,
+                    background: urgencyTab === tab ? "#fff" : "transparent",
+                    color: urgencyTab === tab
+                      ? (tab === "week" && weekCount > 0 ? "#DC2626" : "var(--text-primary)")
+                      : "var(--text-muted)",
+                    boxShadow: urgencyTab === tab ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-            <FilterDropdown label={h.country}  value={country}  options={countries}  onChange={setCountry}  />
-            <FilterDropdown label={h.genre}    value={category} options={categories} onChange={setCategory} />
+            <FilterDropdown label={h.country}  value={country}  options={countries}  onChange={setCountry}  showAllLabel={h.showAll} />
+            <FilterDropdown label={h.genre}    value={category} options={categories} onChange={setCategory} showAllLabel={h.showAll} />
             <div
               className="flex items-center rounded-full border overflow-hidden ml-auto"
               style={{ borderColor: "var(--border)", boxShadow: "var(--shadow-xs)" }}
@@ -381,7 +595,7 @@ export default function SearchableFestivals({ festivals }: { festivals: Festival
         <div className="px-4 pt-3 pb-1 flex items-center justify-between">
           <span style={{ fontSize: "12.5px", color: "var(--text-secondary)" }}>
             <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{filtered.length}</span>
-            {" "}{h.festivals(filtered.length)}
+            {" "}{h.opportunities(filtered.length)}
           </span>
           {hasFilters && (
             <button onClick={reset} className="btn-ghost text-[12px]">{h.reset}</button>
@@ -393,17 +607,56 @@ export default function SearchableFestivals({ festivals }: { festivals: Festival
           {filtered.length === 0 ? (
             <EmptyState hasFilters={hasFilters} onReset={reset} t={t.home} />
           ) : (
-            <ul className="grid gap-3 sm:grid-cols-2">
+            <motion.ul
+              key={`mobile-${query}-${country}-${category}-${sort}`}
+              className="grid gap-3 sm:grid-cols-2"
+              variants={listVariants}
+              initial="hidden"
+              animate="show"
+            >
               {filtered.map((festival, index) => (
-                <li key={festival.id}>
+                <motion.li key={festival.id} variants={itemVariants}>
                   <FestivalCard festival={festival} index={index} lang={lang} />
-                </li>
+                </motion.li>
               ))}
-            </ul>
+            </motion.ul>
           )}
         </div>
       </div>
     </>
+  );
+}
+
+/* ── Urgency group header ─────────────────────────────────── */
+function GroupHeader({ label, count, isHot }: { label: string; count: number; isHot: boolean }) {
+  return (
+    <div className="flex items-center gap-2 px-1 pt-2 pb-1">
+      <span
+        style={{
+          fontSize: "10px",
+          fontWeight: 600,
+          letterSpacing: "0.07em",
+          color: isHot ? "#DC2626" : "var(--text-muted)",
+          textTransform: "uppercase",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {isHot && <span style={{ marginRight: 4 }}>●</span>}{label}
+      </span>
+      <span
+        style={{
+          fontSize: "10px",
+          fontWeight: 500,
+          padding: "1px 6px",
+          borderRadius: 99,
+          background: isHot ? "rgba(220,38,38,0.08)" : "rgba(0,0,0,0.05)",
+          color: isHot ? "#DC2626" : "var(--text-muted)",
+        }}
+      >
+        {count}
+      </span>
+      <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+    </div>
   );
 }
 

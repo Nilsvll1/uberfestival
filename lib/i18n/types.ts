@@ -24,6 +24,21 @@ export type Translations = {
     festivals: (n: number) => string;
     genres: (n: number) => string;
     countries: (n: number) => string;
+    showAll: string;
+    contextTagline: (n: number, genre: string, country: string) => [string, string];
+    closingSoon: (n: number) => string;
+    urgencyGroups: {
+      thisWeek:   string;
+      thisMonth:  string;
+      upcoming:   string;
+      noDeadline: string;
+      expired:    string;
+    };
+    urgencyTabs: {
+      all:       string;
+      thisWeek:  (n: number) => string;
+      thisMonth: (n: number) => string;
+    };
   };
   card: {
     apply: string;

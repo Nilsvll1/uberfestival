@@ -1,38 +1,48 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import type { FestivalImageConfig } from "../../lib/festivalImage";
 
 export default function FestivalImage({
   image,
   category,
   color,
+  layoutId,
 }: {
   image: FestivalImageConfig;
   category: string | null | undefined;
   color: { bg: string; text: string } | null;
+  layoutId?: string;
 }) {
   const [loaded, setLoaded] = useState(false);
 
   return (
     <>
-      {/* Instant gradient placeholder — shows the right color family immediately */}
+      {/* Instant gradient placeholder — correct color family, zero network wait */}
       <div className="absolute inset-0" style={{ background: image.gradient }} />
 
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      {/* Photo: fades + scales in when loaded; participates in shared hero transition */}
+      <motion.img
+        layoutId={layoutId}
         src={image.url}
         alt=""
         aria-hidden="true"
-        className="absolute inset-0 w-full h-full object-cover card-img"
+        className="absolute inset-0 w-full h-full object-cover"
         loading="lazy"
         onLoad={() => setLoaded(true)}
-        style={{
+        animate={{
           opacity: loaded ? 1 : 0,
-          transition: "opacity 500ms ease",
+          scale: loaded ? 1 : 1.05,
+        }}
+        transition={{
+          opacity: { duration: 0.55, ease: "easeOut" },
+          scale: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
+          layout: { type: "spring", stiffness: 200, damping: 26, restDelta: 0.001 },
         }}
       />
 
+      {/* Subtle vignette overlay */}
       <div
         className="absolute inset-0"
         style={{
@@ -45,6 +55,7 @@ export default function FestivalImage({
         }}
       />
 
+      {/* Genre badge */}
       {color && category && (
         <div className="absolute bottom-3 left-3 z-10">
           <span

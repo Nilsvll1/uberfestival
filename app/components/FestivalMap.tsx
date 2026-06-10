@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import type { Festival } from "../../lib/types";
 import { genreColor } from "../../lib/utils";
@@ -11,24 +12,41 @@ delete (L.Icon.Default.prototype as any)._getIconUrl;
 function createMarkerIcon(accentColor: string, active: boolean) {
   const size = active ? 22 : 16;
   const offset = size / 2;
-  // Active marker gets a subtle pulse ring via box-shadow
   const shadow = active
     ? `0 0 0 5px ${accentColor}28, 0 2px 8px rgba(0,0,0,0.22)`
     : `0 2px 8px rgba(0,0,0,0.22), 0 0 0 0.5px rgba(0,0,0,0.08)`;
+  const animClass = active ? "marker-pulse" : "";
   return L.divIcon({
-    html: `<div style="
+    html: `<div class="${animClass}" style="
       width:${size}px;height:${size}px;
       border-radius:50%;
       background:${accentColor};
       border:2.5px solid #fff;
       box-shadow:${shadow};
-      transition:width 160ms cubic-bezier(0.22,1,0.36,1),height 160ms cubic-bezier(0.22,1,0.36,1);
+      transition:width 200ms cubic-bezier(0.22,1,0.36,1),height 200ms cubic-bezier(0.22,1,0.36,1),box-shadow 200ms ease;
       cursor:pointer;
     "></div>`,
     className: "",
     iconSize: [size, size],
     iconAnchor: [offset, offset],
   });
+}
+
+function MapController({ festivals, hoveredId }: { festivals: Festival[]; hoveredId: number | null }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (hoveredId === null) return;
+    const festival = festivals.find((f) => f.id === hoveredId);
+    if (!festival?.latitude || !festival?.longitude) return;
+
+    const latlng = L.latLng(festival.latitude, festival.longitude);
+    if (!map.getBounds().contains(latlng)) {
+      map.panTo(latlng, { animate: true, duration: 0.5, easeLinearity: 0.5 });
+    }
+  }, [hoveredId, festivals, map]);
+
+  return null;
 }
 
 export default function FestivalMap({
@@ -61,6 +79,8 @@ export default function FestivalMap({
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
       />
+
+      <MapController festivals={festivals} hoveredId={hoveredId} />
 
       {festivals.map((festival) => {
         if (!festival.latitude || !festival.longitude) return null;

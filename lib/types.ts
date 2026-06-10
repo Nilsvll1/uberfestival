@@ -8,4 +8,5 @@ export type Festival = {
   submission_deadline: string;
   latitude: number;
   longitude: number;
+  description?: string;
 };

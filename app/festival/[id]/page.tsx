@@ -1,13 +1,48 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 import FestivalMapWrapper from "../../components/FestivalMapWrapper";
 import FestivalCard from "../../components/FestivalCard";
+import DetailHero from "../../components/DetailHero";
+import ScrollReveal from "../../components/ScrollReveal";
 import { formatDeadline, genreColor } from "../../../lib/utils";
 import { getFestivalImage, getMood, getAtmosphericText } from "../../../lib/festivalImage";
 import { getTranslations, isValidLanguage, DEFAULT_LANGUAGE, LANG_COOKIE } from "../../../lib/i18n";
 import type { Festival } from "../../../lib/types";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const { data } = await supabase
+    .from("festivals")
+    .select("festival_name, city, country, category")
+    .eq("id", id)
+    .single();
+
+  if (!data) return { title: "Festival | UberFestival" };
+
+  const location = [data.city, data.country].filter(Boolean).join(", ");
+  const title = location
+    ? `${data.festival_name} — ${location} | UberFestival`
+    : `${data.festival_name} | UberFestival`;
+  const description = [
+    data.category ? `${data.category} festival` : "Music festival",
+    location ? `in ${location}` : null,
+    "— submit your application on UberFestival.",
+  ].filter(Boolean).join(" ");
+
+  return {
+    title,
+    description,
+    openGraph: { title, description },
+    twitter: { title, description },
+  };
+}
 
 export default async function FestivalPage({
   params,
@@ -56,36 +91,16 @@ export default async function FestivalPage({
                                       "#16A34A";
 
   return (
-    <main className="page-enter">
+    <main>
 
       {/* ╔════════════════════════════════════════════════════╗
-          ║  HERO — full-bleed cinematic image                 ║
+          ║  HERO — parallax + shared transition with card     ║
           ╚════════════════════════════════════════════════════╝ */}
-      <div
-        className="relative overflow-hidden"
-        style={{ height: "62vh", minHeight: 420, maxHeight: 720 }}
+      <DetailHero
+        imageUrl={image.url.replace("w=900", "w=1600").replace("q=75", "q=80")}
+        gradient={image.gradient}
+        festivalId={festival.id}
       >
-        {/* Gradient background (instant, no network) */}
-        <div className="absolute inset-0" style={{ background: image.gradient }} />
-
-        {/* Hero photograph */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={image.url.replace("w=900", "w=1600").replace("q=75", "q=80")}
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover hero-img"
-        />
-
-        {/* Cinematic overlay — light at top, very dark at bottom */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.15) 35%, rgba(0,0,0,0.65) 70%, rgba(0,0,0,0.88) 100%)",
-          }}
-        />
-
         {/* Back button — frosted glass pill */}
         <Link
           href="/"
@@ -104,7 +119,7 @@ export default async function FestivalPage({
           style={{ maxWidth: 900, margin: "0 auto" }}
         >
           {/* Genre + location row */}
-          <div className="hero-meta flex items-center gap-2.5 mb-4 flex-wrap">
+          <div className="flex items-center gap-2.5 mb-4 flex-wrap">
             {color && festival.category && (
               <span
                 className="text-[10.5px] font-semibold px-2.5 py-1 rounded-full"
@@ -136,7 +151,7 @@ export default async function FestivalPage({
 
           {/* Festival name */}
           <h1
-            className="hero-title font-bold leading-[1.05]"
+            className="font-bold leading-[1.05]"
             style={{
               fontSize: "clamp(2rem, 5.5vw, 3.8rem)",
               letterSpacing: "-0.035em",
@@ -147,7 +162,7 @@ export default async function FestivalPage({
           </h1>
 
           {/* Deadline + CTA */}
-          <div className="hero-cta flex items-center gap-4 mt-6 flex-wrap">
+          <div className="flex items-center gap-4 mt-6 flex-wrap">
             {festival.application_url && (
               <a
                 href={festival.application_url}
@@ -174,7 +189,7 @@ export default async function FestivalPage({
             )}
           </div>
         </div>
-      </div>
+      </DetailHero>
 
       {/* ╔════════════════════════════════════════════════════╗
           ║  PAGE CONTENT                                       ║
@@ -182,6 +197,7 @@ export default async function FestivalPage({
       <div className="max-w-[900px] mx-auto px-5 lg:px-8 py-10 lg:py-14">
 
         {/* ── Atmosphere ────────────────────────────────────── */}
+        <ScrollReveal delay={0.05}>
         <section className="mb-12 lg:mb-16">
           <p
             className="uppercase font-semibold tracking-[0.1em] mb-4"
@@ -210,8 +226,10 @@ export default async function FestivalPage({
             {atmText}
           </p>
         </section>
+        </ScrollReveal>
 
         {/* ── Info + Map grid ────────────────────────────────── */}
+        <ScrollReveal delay={0.1}>
         <div className="grid lg:grid-cols-2 gap-6 mb-12 lg:mb-16">
 
           {/* Info card */}
@@ -246,11 +264,11 @@ export default async function FestivalPage({
                   badge={color}
                 />
               )}
-              {festival.submission_deadline && (
+              {deadline && (
                 <InfoRow
                   icon={<IconCalendar />}
                   label={t.festival.deadline}
-                  value={festival.submission_deadline}
+                  value={deadline.label}
                   valueColor={dlColorContent}
                 />
               )}
@@ -322,8 +340,10 @@ export default async function FestivalPage({
             </div>
           )}
         </div>
+        </ScrollReveal>
 
         {/* ── Related ────────────────────────────────────────── */}
+        <ScrollReveal delay={0.05}>
         {related && related.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-5">
@@ -358,6 +378,7 @@ export default async function FestivalPage({
             </ul>
           </section>
         )}
+        </ScrollReveal>
       </div>
     </main>
   );

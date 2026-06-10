@@ -1,6 +1,63 @@
 import type { Language } from "./i18n/types";
+import type { Festival } from "./types";
 
 export type DeadlineStatus = "ok" | "soon" | "urgent" | "expired";
+
+/* ── Urgency grouping ──────────────────────────────────────── */
+export type UrgencyGroup = "this-week" | "this-month" | "upcoming" | "no-deadline" | "expired";
+
+export function getUrgencyGroup(deadline: string | null | undefined): UrgencyGroup {
+  if (!deadline) return "no-deadline";
+  const today = new Date().toISOString().slice(0, 10);
+  const dl = deadline.slice(0, 10);
+  if (dl < today) return "expired";
+  const daysLeft = Math.round((new Date(dl).getTime() - new Date(today).getTime()) / 86400000);
+  if (daysLeft <= 7)  return "this-week";
+  if (daysLeft <= 30) return "this-month";
+  return "upcoming";
+}
+
+/* ── Opportunity score (0–100) ─────────────────────────────── */
+export type ScoreTier = "hot" | "strong" | "good" | "limited";
+
+export function getOpportunityScore(festival: Festival): {
+  score: number;
+  tier:  ScoreTier;
+  color: string;
+  bg:    string;
+} {
+  let score = 0;
+
+  // Actionability (0–35): can the artist actually apply?
+  if (festival.application_url) score += 35;
+
+  // Urgency / timing (0–35)
+  if (festival.submission_deadline) {
+    const today = new Date().toISOString().slice(0, 10);
+    const dl    = festival.submission_deadline.slice(0, 10);
+    if (dl >= today) {
+      const days = Math.round((new Date(dl).getTime() - new Date(today).getTime()) / 86400000);
+      if (days <= 7)  score += 35;
+      else if (days <= 30) score += 25;
+      else if (days <= 90) score += 15;
+      else score += 8;
+    }
+    // expired deadline: +0 (urgency gone, completeness still counts)
+  }
+
+  // Completeness (0–30)
+  if (festival.city)        score += 8;
+  if (festival.country)     score += 8;
+  if (festival.category)    score += 7;
+  if (festival.description) score += 7;
+
+  score = Math.min(100, score);
+
+  if (score >= 75) return { score, tier: "hot",     color: "#DC2626", bg: "rgba(220,38,38,0.10)"  };
+  if (score >= 55) return { score, tier: "strong",  color: "#D97706", bg: "rgba(217,119,6,0.10)"  };
+  if (score >= 35) return { score, tier: "good",    color: "#16A34A", bg: "rgba(22,163,74,0.10)"  };
+  return                   { score, tier: "limited", color: "#9CA3AF", bg: "rgba(0,0,0,0.06)"     };
+}
 
 export function formatDeadline(
   dateStr: string | null | undefined,

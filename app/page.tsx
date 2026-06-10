@@ -30,7 +30,7 @@ export default async function Home() {
   }
 
   return (
-    <main className="flex-1 overflow-hidden page-enter">
+    <main className="flex-1 overflow-hidden">
       <Suspense>
         <SearchableFestivals festivals={data || []} />
       </Suspense>
