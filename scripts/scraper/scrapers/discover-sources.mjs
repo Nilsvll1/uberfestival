@@ -154,10 +154,12 @@ function extractCandidateLinks(html, sourceUrl) {
 }
 
 function looksLikeListingPage(html) {
-  // A listing page has many links in a list structure — skip it.
+  // Skip pages that look like paginated directories (many repeated card/item
+  // elements) rather than individual festival pages.
+  // We use a high threshold (60) so that normal nav menus don't trigger this.
   const $ = cheerio.load(html);
   const listLinks = $("ul a, ol a").length;
-  return listLinks > 20;
+  return listLinks > 60;
 }
 
 async function loadKnownUrls() {
