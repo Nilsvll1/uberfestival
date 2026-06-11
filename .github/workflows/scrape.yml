@@ -1,0 +1,57 @@
+name: Festival Scraper
+
+on:
+  # Every Monday at 06:00 UTC — quiet time, low festival-server load.
+  schedule:
+    - cron: "0 6 * * 1"
+
+  # Allows manual trigger from the GitHub Actions UI.
+  # Set 'mode' to 'update', 'discover', or 'all'.
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Scrape mode"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - update
+          - discover
+
+jobs:
+  scrape:
+    name: Scrape festivals
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: scripts/scraper/package.json
+
+      - name: Install scraper dependencies
+        working-directory: scripts/scraper
+        run: npm install
+
+      - name: Run scraper
+        working-directory: scripts/scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          MODE="${{ github.event.inputs.mode || 'all' }}"
+          node index.mjs --mode=$MODE
+
+      - name: Post summary
+        if: always()
+        run: |
+          echo "### Scraper run complete" >> $GITHUB_STEP_SUMMARY
+          echo "Mode: ${{ github.event.inputs.mode || 'all' }}" >> $GITHUB_STEP_SUMMARY
+          echo "Time: $(date -u)" >> $GITHUB_STEP_SUMMARY

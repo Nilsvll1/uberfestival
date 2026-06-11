@@ -338,3 +338,52 @@ body {
   border-color: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.82);
 }
+
+/* ─── Admin UI utilities ─────────────────────────────────────── */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  background: linear-gradient(180deg, #7577F9 0%, #6366F1 48%, #5254E8 100%);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  border-radius: 9px;
+  padding: 8px 16px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.btn-primary:hover { opacity: 0.88; }
+.btn-primary:active { transform: scale(0.97); }
+
+.btn-sm {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(0,0,0,0.04);
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 12px;
+  border-radius: 7px;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 120ms ease;
+  white-space: nowrap;
+}
+.btn-sm:hover { background: rgba(0,0,0,0.08); }
+
+.input {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 8px 12px;
+  font-size: 13.5px;
+  color: var(--text-primary);
+  background: #fff;
+  outline: none;
+  width: 100%;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}

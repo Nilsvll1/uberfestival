@@ -1,0 +1,15 @@
+{
+  "name": "festival-scraper",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Scrapes festival open calls and updates the Supabase database.",
+  "scripts": {
+    "start": "node index.mjs",
+    "update": "node index.mjs --mode=update",
+    "discover": "node index.mjs --mode=discover"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "cheerio": "^1.0.0"
+  }
+}
