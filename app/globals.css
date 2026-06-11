@@ -319,6 +319,15 @@ body {
   font-family: var(--font-geist-sans), system-ui, sans-serif !important;
 }
 
+/* ─── Testimonials infinite-scroll animation ────────────────── */
+@keyframes testimonials-scroll {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [style*="testimonials-scroll"] { animation: none !important; }
+}
+
 /* ─── Testimonial cards — dark theme ────────────────────────── */
 .testimonials-section {
   --bg: #06060A;

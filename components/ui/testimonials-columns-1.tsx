@@ -1,6 +1,5 @@
 "use client";
 import React from "react";
-import { motion } from "motion/react";
 
 type Testimonial = {
   text: string;
@@ -14,19 +13,12 @@ export const TestimonialsColumn = (props: {
   testimonials: Testimonial[];
   duration?: number;
 }) => {
+  const duration = props.duration ?? 10;
   return (
     <div className={props.className}>
-      <motion.div
-        animate={{
-          translateY: "-50%",
-        }}
-        transition={{
-          duration: props.duration || 10,
-          repeat: Infinity,
-          ease: "linear",
-          repeatType: "loop",
-        }}
+      <div
         className="flex flex-col gap-6 pb-6 bg-background"
+        style={{ animation: `testimonials-scroll ${duration}s linear infinite` }}
       >
         {[
           ...new Array(2).fill(0).map((_, index) => (
@@ -59,7 +51,7 @@ export const TestimonialsColumn = (props: {
             </React.Fragment>
           )),
         ]}
-      </motion.div>
+      </div>
     </div>
   );
 };
