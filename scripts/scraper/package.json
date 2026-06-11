@@ -9,7 +9,7 @@
     "discover": "node index.mjs --mode=discover"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0",
+    "@supabase/postgrest-js": "^1.16.0",
     "cheerio": "^1.0.0"
   }
 }
