@@ -157,7 +157,7 @@ export default async function FestivalPage({
       >
         {/* Back button — frosted glass pill */}
         <Link
-          href="/"
+          href="/explore"
           className="hero-back-btn absolute top-5 left-5 lg:top-7 lg:left-8 z-10"
         >
           <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
@@ -416,7 +416,7 @@ export default async function FestivalPage({
                 </h2>
               </div>
               <Link
-                href="/"
+                href="/explore"
                 className="transition-opacity hover:opacity-60"
                 style={{ fontSize: "13px", color: "var(--accent)" }}
               >

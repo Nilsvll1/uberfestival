@@ -29,6 +29,7 @@ function Field({
   placeholder,
   autoComplete,
   required,
+  autoFocus,
 }: {
   label: string;
   id: string;
@@ -38,12 +39,13 @@ function Field({
   placeholder?: string;
   autoComplete?: string;
   required?: boolean;
+  autoFocus?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label
         htmlFor={id}
-        style={{ fontSize: "12px", fontWeight: 500, color: "var(--text-secondary)" }}
+        style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-secondary)", letterSpacing: "0.04em", textTransform: "uppercase" }}
       >
         {label}
       </label>
@@ -55,14 +57,23 @@ function Field({
         placeholder={placeholder}
         autoComplete={autoComplete}
         required={required}
-        className="input-search w-full rounded-[10px] border"
+        autoFocus={autoFocus}
+        className="w-full rounded-[10px] border outline-none transition-all"
         style={{
           fontSize: "14px",
-          padding: "10px 14px",
+          padding: "11px 14px",
           color: "var(--text-primary)",
-          background: "rgba(255,255,255,0.8)",
+          background: "rgba(255,255,255,0.9)",
           borderColor: "var(--border)",
-          boxShadow: "var(--shadow-xs)",
+          boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.borderColor = "var(--accent)";
+          e.currentTarget.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12), 0 1px 2px rgba(0,0,0,0.04)";
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.borderColor = "var(--border)";
+          e.currentTarget.style.boxShadow = "0 1px 2px rgba(0,0,0,0.04)";
         }}
       />
     </div>
@@ -91,7 +102,7 @@ function GoogleButton({
         background: "#fff",
         borderColor: "var(--border-strong)",
         color: "var(--text-primary)",
-        boxShadow: "var(--shadow-sm)",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
         opacity: loading ? 0.6 : 1,
         cursor: loading ? "not-allowed" : "pointer",
         transition: "box-shadow 140ms ease, transform 140ms ease",
@@ -104,11 +115,10 @@ function GoogleButton({
         }
       }}
       onMouseOut={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.boxShadow = "var(--shadow-sm)";
+        (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.08)";
         (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
       }}
     >
-      {/* Google G icon */}
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
         <path
           d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"
@@ -171,7 +181,6 @@ function AuthForm({
   const isSignIn = view === "sign_in";
 
   const afterAuth = useCallback(async () => {
-    // Sync any locally-saved festivals to the DB.
     const localIds = readLocalSaves();
     if (localIds.length > 0) {
       await syncLocalSaves(localIds);
@@ -190,10 +199,15 @@ function AuthForm({
     if (isSignIn) {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
+        const isUnconfirmed = error.message.includes("not confirmed") || error.code === "email_not_confirmed";
         setError(
-          lang === "fr"
-            ? "Email ou mot de passe incorrect."
-            : "Incorrect email or password."
+          isUnconfirmed
+            ? (lang === "fr"
+                ? "Confirme ton email avant de te connecter. Vérifie ta messagerie."
+                : "Please confirm your email before signing in. Check your inbox.")
+            : (lang === "fr"
+                ? "Email ou mot de passe incorrect."
+                : "Incorrect email or password.")
         );
       } else {
         await afterAuth();
@@ -231,15 +245,11 @@ function AuthForm({
       setError(error.message);
       setGoogleLoading(false);
     }
-    // On success the page redirects — no need to reset loading.
   }
 
   if (success) {
     return (
-      <div
-        className="flex flex-col items-center gap-4 py-8 text-center"
-        style={{ maxWidth: 320, margin: "0 auto" }}
-      >
+      <div className="flex flex-col items-center gap-4 py-6 text-center">
         <div
           className="w-12 h-12 rounded-2xl flex items-center justify-center"
           style={{
@@ -264,11 +274,11 @@ function AuthForm({
   }
 
   return (
-    <div style={{ maxWidth: mode === "page" ? 380 : "none" }}>
+    <div>
       {/* Header */}
-      <div className="mb-7">
+      <div className="mb-6">
         <div
-          className="inline-flex items-center justify-center rounded-[12px] mb-5"
+          className="inline-flex items-center justify-center rounded-[12px] mb-4"
           style={{
             width: 44,
             height: 44,
@@ -283,6 +293,7 @@ function AuthForm({
           </svg>
         </div>
         <h1
+          id="auth-dialog-title"
           className="font-extrabold"
           style={{ fontSize: "22px", letterSpacing: "-0.035em", color: "var(--text-primary)", lineHeight: 1.2 }}
         >
@@ -290,7 +301,7 @@ function AuthForm({
             ? (lang === "fr" ? "Bon retour." : "Welcome back.")
             : (lang === "fr" ? "Rejoins UberFestival." : "Join UberFestival.")}
         </h1>
-        <p style={{ fontSize: "13.5px", color: "var(--text-secondary)", marginTop: 5, lineHeight: 1.5 }}>
+        <p style={{ fontSize: "13.5px", color: "var(--text-secondary)", marginTop: 6, lineHeight: 1.55 }}>
           {isSignIn
             ? (lang === "fr" ? "Ton tableau de bord t'attend." : "Your career dashboard is waiting.")
             : (lang === "fr" ? "Retrouve et sauvegarde tes opportunités." : "Discover and track festival opportunities.")}
@@ -318,6 +329,7 @@ function AuthForm({
             onChange={setName}
             placeholder={lang === "fr" ? "Ton nom de scène" : "Your stage name"}
             autoComplete="name"
+            autoFocus={!isSignIn}
           />
         )}
         <Field
@@ -327,8 +339,9 @@ function AuthForm({
           value={email}
           onChange={setEmail}
           placeholder="you@example.com"
-          autoComplete={isSignIn ? "email" : "email"}
+          autoComplete="email"
           required
+          autoFocus={isSignIn}
         />
         <Field
           label={lang === "fr" ? "Mot de passe" : "Password"}
@@ -353,13 +366,30 @@ function AuthForm({
         <button
           type="submit"
           disabled={loading}
-          className="btn-cta w-full font-semibold rounded-[11px] flex items-center justify-center"
+          className="w-full font-semibold rounded-[11px] flex items-center justify-center transition-all"
           style={{
-            fontSize: "14px",
-            padding: "11px 16px",
-            marginTop: 2,
-            opacity: loading ? 0.7 : 1,
+            fontSize: "14.5px",
+            padding: "13px 16px",
+            marginTop: 4,
+            background: loading
+              ? "rgba(99,102,241,0.6)"
+              : "linear-gradient(135deg, #6366F1 0%, #5254E8 100%)",
+            color: "#fff",
+            boxShadow: loading ? "none" : "0 4px 18px rgba(99,102,241,0.4), 0 1px 3px rgba(99,102,241,0.2)",
             cursor: loading ? "not-allowed" : "pointer",
+            letterSpacing: "-0.01em",
+          }}
+          onMouseOver={(e) => {
+            if (!loading) {
+              (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                "0 6px 24px rgba(99,102,241,0.5), 0 2px 6px rgba(99,102,241,0.25)";
+              (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
+            }
+          }}
+          onMouseOut={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.boxShadow =
+              "0 4px 18px rgba(99,102,241,0.4), 0 1px 3px rgba(99,102,241,0.2)";
+            (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
           }}
         >
           {loading
@@ -401,9 +431,9 @@ export default function AuthModal({
   onClose: () => void;
   initialView?: View;
 }) {
-  const backdropRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
-  // Close on Escape
+  // ESC close
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -412,7 +442,7 @@ export default function AuthModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [isOpen, onClose]);
 
-  // Lock body scroll while open
+  // Lock body scroll
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -422,48 +452,78 @@ export default function AuthModal({
     return () => { document.body.style.overflow = ""; };
   }, [isOpen]);
 
+  // Focus trap
+  useEffect(() => {
+    if (!isOpen || !panelRef.current) return;
+    const panel = panelRef.current;
+    const focusable = panel.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    function onTab(e: KeyboardEvent) {
+      if (e.key !== "Tab") return;
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last?.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      }
+    }
+    document.addEventListener("keydown", onTab);
+    return () => document.removeEventListener("keydown", onTab);
+  }, [isOpen]);
+
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            ref={backdropRef}
-            className="fixed inset-0 z-[900]"
-            style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
-            onClick={(e) => { if (e.target === backdropRef.current) onClose(); }}
-          />
-
+        /* Overlay — centering container + backdrop */
+        <motion.div
+          className="fixed inset-0 z-[900] flex items-center justify-center p-4 sm:p-6"
+          style={{
+            background: "rgba(8, 8, 18, 0.6)",
+            backdropFilter: "blur(14px) saturate(180%)",
+            WebkitBackdropFilter: "blur(14px) saturate(180%)",
+          }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          onClick={onClose}
+          aria-hidden="false"
+        >
           {/* Panel */}
           <motion.div
-            className="fixed left-1/2 top-1/2 z-[901] w-full"
-            style={{ maxWidth: 420, padding: "0 16px" }}
-            initial={{ opacity: 0, scale: 0.95, y: "-48%" }}
-            animate={{ opacity: 1, scale: 1, y: "-50%" }}
-            exit={{ opacity: 0, scale: 0.97, y: "-48%" }}
-            transition={{ type: "spring", stiffness: 380, damping: 32, mass: 0.8 }}
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="auth-dialog-title"
+            className="relative w-full rounded-[22px] overflow-y-auto"
+            style={{
+              maxWidth: 420,
+              maxHeight: "90vh",
+              background: "rgba(252, 252, 253, 0.98)",
+              backdropFilter: "blur(32px) saturate(200%)",
+              WebkitBackdropFilter: "blur(32px) saturate(200%)",
+              border: "1px solid rgba(255,255,255,0.9)",
+              boxShadow:
+                "0 0 0 1px rgba(0,0,0,0.06), 0 40px 100px rgba(0,0,0,0.3), 0 12px 32px rgba(0,0,0,0.14)",
+            }}
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.97 }}
+            transition={{ type: "tween", duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            onClick={(e) => e.stopPropagation()}
           >
-            <div
-              className="relative rounded-[22px] p-8"
-              style={{
-                background: "rgba(250,250,251,0.98)",
-                backdropFilter: "blur(32px) saturate(200%)",
-                WebkitBackdropFilter: "blur(32px) saturate(200%)",
-                border: "1px solid rgba(0,0,0,0.08)",
-                boxShadow: "0 32px 80px rgba(0,0,0,0.22), 0 8px 24px rgba(0,0,0,0.10)",
-              }}
-            >
+            <div className="p-7 sm:p-8">
               {/* Close button */}
               <button
                 onClick={onClose}
-                className="absolute top-5 right-5 w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+                className="absolute top-5 right-5 w-7 h-7 rounded-full flex items-center justify-center"
                 style={{
                   background: "rgba(0,0,0,0.06)",
                   color: "var(--text-muted)",
+                  transition: "background 140ms ease",
                 }}
                 onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(0,0,0,0.10)"; }}
                 onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(0,0,0,0.06)"; }}
@@ -481,7 +541,7 @@ export default function AuthModal({
               />
             </div>
           </motion.div>
-        </>
+        </motion.div>
       )}
     </AnimatePresence>
   );
@@ -490,9 +550,7 @@ export default function AuthModal({
 /* ── Page mode export ────────────────────────────────────────── */
 export function AuthPage({ initialView = "sign_in" }: { initialView?: View }) {
   return (
-    <div
-      className="min-h-[70vh] flex items-center justify-center px-5 py-16"
-    >
+    <div className="min-h-[70vh] flex items-center justify-center px-5 py-16">
       <div
         className="w-full rounded-[22px] p-8 sm:p-10"
         style={{

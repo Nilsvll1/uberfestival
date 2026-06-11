@@ -250,7 +250,7 @@ export default async function DashboardPage() {
             }
           />
           <Link
-            href="/"
+            href="/explore"
             style={{ fontSize: "13px", color: "var(--accent)", textDecoration: "none" }}
             className="hover:opacity-70 transition-opacity"
           >
@@ -279,7 +279,7 @@ export default async function DashboardPage() {
                 {lang === "fr" ? "Explore la carte et sauvegarde des festivals." : "Browse the map and save festivals you're interested in."}
               </p>
             </div>
-            <Link href="/" className="btn-cta inline-flex items-center gap-2 font-semibold rounded-[11px] px-4 py-2.5" style={{ fontSize: "13px" }}>
+            <Link href="/explore" className="btn-cta inline-flex items-center gap-2 font-semibold rounded-[11px] px-4 py-2.5" style={{ fontSize: "13px" }}>
               {lang === "fr" ? "Explorer les festivals" : "Explore festivals"}
             </Link>
           </div>

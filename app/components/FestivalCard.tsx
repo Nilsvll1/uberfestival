@@ -67,7 +67,6 @@ export default function FestivalCard({
       style={{
         boxShadow,
         borderColor: isActive ? "var(--accent)" : "var(--border)",
-        willChange: "transform",
       }}
       animate={{
         opacity: isDimmed ? 0.55 : 1,

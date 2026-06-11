@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 /* ─── Design tokens ─────────────────────────────────────────── */
 :root {
@@ -313,5 +314,3 @@ body {
 .leaflet-container {
   font-family: var(--font-geist-sans), system-ui, sans-serif !important;
 }
-
-@import "leaflet/dist/leaflet.css";
