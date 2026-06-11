@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
+@theme {
+  --color-primary: #6366F1;
+}
+
 /* ─── Design tokens ─────────────────────────────────────────── */
 :root {
   --bg:             #F5F5F7;
@@ -313,4 +317,15 @@ body {
 .leaflet-attribution-flag           { display: none !important; }
 .leaflet-container {
   font-family: var(--font-geist-sans), system-ui, sans-serif !important;
+}
+
+/* ─── Testimonial cards — dark theme ────────────────────────── */
+.testimonials-section {
+  --bg: #06060A;
+  --color-background: #06060A;
+}
+.testimonials-section .rounded-3xl {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.82);
 }

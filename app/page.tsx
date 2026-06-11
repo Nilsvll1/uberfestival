@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { ContainerScroll } from "@/components/ui/container-scroll-animation";
+import { TestimonialsSection } from "@/components/ui/testimonials-section";
 
 export const metadata: Metadata = {
   title: "UberFestival — Festival opportunities for music professionals",
@@ -326,6 +327,9 @@ export default function LandingPage() {
           ))}
         </div>
       </section>
+
+      {/* ── Testimonials ─────────────────────────────────────────── */}
+      <TestimonialsSection />
 
       {/* ── Final CTA ────────────────────────────────────────────── */}
       <section
