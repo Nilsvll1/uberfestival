@@ -111,13 +111,40 @@ const ARTICLE_TITLE_RES = [
   /^a guide to /i,
 ];
 
-// ── Exact-match generic page titles — directory/listing pages staging themselves
+// ── Exact-match generic page titles — directory/listing/hub pages
+// These are page-section headings, not specific opportunity names.
 const GENERIC_PAGE_TITLES = new Set([
   "opportunities", "funding", "grants", "awards", "competitions", "residencies",
   "programs", "programmes", "showcases", "resources", "events", "news", "blog",
   "home", "about", "contact", "articles", "members", "listing", "directory",
   "launching soon", "coming soon", "under construction",
+  "faq", "frequently asked questions", "grantee faq", "featured articles",
+  "announcements", "newsletter", "apply", "submit", "applications", "submissions",
+  "what we fund", "who we fund", "our work", "our programmes", "our programs",
+  "open calls", "latest opportunities", "current opportunities",
+  "funding opportunities", "support", "help", "services",
 ]);
+
+// ── Regex patterns for titles that are announcements or news posts
+const ANNOUNCEMENT_TITLE_RES = [
+  /^announcing\b/i,                         // "Announcing Over 300 New Showcase Artists"
+  /^we('re| are) (excited|pleased|proud)/i, // "We're excited to announce..."
+  /\bover \d+\s+(new|emerging)\b/i,         // "Over 300 New Showcase Artists"
+  /^grantee\b/i,                            // "Grantee FAQ", "Grantee Resources"
+  /^recipient\b/i,                          // "Recipients 2024"
+  /\b20\d\d (recipients|grantees|winners)\b/i, // "2025 Recipients"
+  /^meet (the|our)\b/i,                     // "Meet the Artists"
+  /^introducing\b/i,                        // "Introducing our new cohort"
+  /^update:/i,                              // "Update: Applications now..."
+  /^news:/i,
+];
+
+// ── Phrases that must NOT appear anywhere in the country or city field
+const GEO_BAD_PHRASES = [
+  "contact", "information", "online", "announcement", "news", "please",
+  "further", "email", "website", "click", "here", "details", "visit",
+  "scotland for", "england for", "ireland for", "wales for",
+];
 
 // ── Positive: strong signals that this is a real opportunity ─────────────────
 
@@ -197,6 +224,29 @@ export function classifyPage(url, extracted) {
   // ── Hard reject: generic listing/directory page title ────────────────────
   if (GENERIC_PAGE_TITLES.has(extracted.festival_name.trim().toLowerCase())) {
     return { confidence: 0, accept: false, reason: `generic page title: "${extracted.festival_name}"` };
+  }
+
+  // ── Hard reject: announcement / news post title ───────────────────────────
+  if (ANNOUNCEMENT_TITLE_RES.some(re => re.test(extracted.festival_name.trim()))) {
+    return { confidence: 0, accept: false, reason: `announcement/news title: "${extracted.festival_name}"` };
+  }
+
+  // ── Hard reject: malformed country or city field ──────────────────────────
+  // Catches extraction artifacts like "please contact online" or
+  // "All Scotland For further information" that slipped through sanitizeGeo.
+  if (extracted.country) {
+    const cLower = extracted.country.toLowerCase();
+    const cWords = extracted.country.trim().split(/\s+/);
+    if (cWords.length > 3 || GEO_BAD_PHRASES.some(p => cLower.includes(p))) {
+      return { confidence: 0, accept: false, reason: `invalid country value: "${extracted.country}"` };
+    }
+  }
+  if (extracted.city) {
+    const cLower = extracted.city.toLowerCase();
+    const cWords = extracted.city.trim().split(/\s+/);
+    if (cWords.length > 4 || GEO_BAD_PHRASES.some(p => cLower.includes(p))) {
+      return { confidence: 0, accept: false, reason: `invalid city value: "${extracted.city}"` };
+    }
   }
 
   // ── Hard reject: person name pattern ─────────────────────────────────────

@@ -13,7 +13,8 @@ const APPLY_LINK_KEYWORDS = [
   "call for", "open call",
 ];
 
-// ccTLD → country name fallback when no geographic text is found.
+// ccTLD → country name. Used ONLY as a last resort when no structured geo exists.
+// Only includes unambiguous single-country TLDs (not .co, .io, .org, etc.).
 const TLD_COUNTRY = {
   ".de": "Germany",      ".fr": "France",        ".ie": "Ireland",
   ".nl": "Netherlands",  ".be": "Belgium",       ".at": "Austria",
@@ -32,103 +33,70 @@ const TLD_COUNTRY = {
   ".ma": "Morocco",      ".eg": "Egypt",         ".gh": "Ghana",
 };
 
-// Country names checked against body text (longer strings first to avoid substrings).
-const COUNTRY_PATTERNS = [
-  ["united states of america", "United States"],
-  ["united states", "United States"],
-  ["united kingdom", "United Kingdom"],
-  ["new zealand", "New Zealand"],
-  ["south africa", "South Africa"],
-  ["south korea", "South Korea"],
-  ["czech republic", "Czech Republic"],
-  ["netherlands", "Netherlands"],
-  ["switzerland", "Switzerland"],
-  ["philippines", "Philippines"],
-  ["australia", "Australia"],
-  ["argentina", "Argentina"],
-  ["singapore", "Singapore"],
-  ["indonesia", "Indonesia"],
-  ["colombia", "Colombia"],
-  ["portugal", "Portugal"],
-  ["malaysia", "Malaysia"],
-  ["thailand", "Thailand"],
-  ["slovakia", "Slovakia"],
-  ["slovenia", "Slovenia"],
-  ["ethiopia", "Ethiopia"],
-  ["denmark", "Denmark"],
-  ["belgium", "Belgium"],
-  ["finland", "Finland"],
-  ["austria", "Austria"],
-  ["ukraine", "Ukraine"],
-  ["croatia", "Croatia"],
-  ["romania", "Romania"],
-  ["hungary", "Hungary"],
-  ["germany", "Germany"],
-  ["ireland", "Ireland"],
-  ["nigeria", "Nigeria"],
-  ["ecuador", "Ecuador"],
-  ["morocco", "Morocco"],
-  ["sweden", "Sweden"],
-  ["norway", "Norway"],
-  ["poland", "Poland"],
-  ["russia", "Russia"],
-  ["brazil", "Brazil"],
-  ["mexico", "Mexico"],
-  ["france", "France"],
-  ["canada", "Canada"],
-  ["israel", "Israel"],
-  ["turkey", "Turkey"],
-  ["greece", "Greece"],
-  ["india", "India"],
-  ["ghana", "Ghana"],
-  ["kenya", "Kenya"],
-  ["egypt", "Egypt"],
-  ["japan", "Japan"],
-  ["spain", "Spain"],
-  ["italy", "Italy"],
-  ["chile", "Chile"],
-  ["china", "China"],
-  ["peru", "Peru"],
-  ["usa", "United States"],
-  ["u.s.a.", "United States"],
-  ["uk", "United Kingdom"],
-];
+// ISO 3166-1 alpha-2 → country name, for <meta name="geo.region"> like "GB", "US-CA".
+const ISO2_COUNTRY = {
+  AF: "Afghanistan",  AL: "Albania",      DZ: "Algeria",      AR: "Argentina",
+  AU: "Australia",    AT: "Austria",      BE: "Belgium",      BR: "Brazil",
+  CA: "Canada",       CL: "Chile",        CN: "China",        CO: "Colombia",
+  HR: "Croatia",      CZ: "Czech Republic", DK: "Denmark",   EG: "Egypt",
+  FI: "Finland",      FR: "France",       DE: "Germany",      GH: "Ghana",
+  GR: "Greece",       HU: "Hungary",      IN: "India",        ID: "Indonesia",
+  IE: "Ireland",      IL: "Israel",       IT: "Italy",        JP: "Japan",
+  KE: "Kenya",        KR: "South Korea",  MX: "Mexico",       MA: "Morocco",
+  NL: "Netherlands",  NZ: "New Zealand",  NG: "Nigeria",      NO: "Norway",
+  PH: "Philippines",  PL: "Poland",       PT: "Portugal",     RO: "Romania",
+  RS: "Serbia",       SG: "Singapore",    SI: "Slovenia",     ZA: "South Africa",
+  ES: "Spain",        SE: "Sweden",       CH: "Switzerland",  TH: "Thailand",
+  TR: "Turkey",       UA: "Ukraine",      GB: "United Kingdom", US: "United States",
+};
 
-// Words that give location context to a nearby country name.
-const LOCATION_CONTEXT_WORDS = [
-  "festival", "held in", "takes place", "located in", "based in",
-  "venue", "city", "location", "country", "address", "hosted in",
-  "happening in", "performed in", "event in",
-];
+/**
+ * Validates a geo value extracted from structured data.
+ * Rejects anything that looks like prose text instead of a place name.
+ * Returns the value unchanged, or null if it fails validation.
+ */
+function sanitizeGeo(value) {
+  if (!value || typeof value !== "string") return null;
+  const v = value.trim();
+  if (!v || v.length > 60) return null;
+
+  const words = v.split(/\s+/);
+  if (words.length > 3) return null; // more than 3 words → likely prose, not a place name
+
+  const lower = v.toLowerCase();
+  const BAD_WORDS = new Set([
+    "contact", "information", "online", "announcement", "news", "please",
+    "further", "email", "website", "click", "here", "more", "details",
+    "visit", "see", "read", "learn", "get", "apply", "http", "www",
+    "available", "open", "for", "via", "and", "the", "all",
+  ]);
+  if (words.some(w => BAD_WORDS.has(w.replace(/[^a-z]/g, "").toLowerCase()))) return null;
+
+  if (!/^[A-Za-z]/.test(v)) return null; // must start with a letter
+
+  return v;
+}
 
 /**
  * Extracts structured festival data from a page's HTML.
- *
- * @param {string} html
- * @param {string} pageUrl
- * @returns {object}
  */
 export function extractFestivalInfo(html, pageUrl) {
   const $ = cheerio.load(html);
 
-  // Remove noise — but KEEP ld+json scripts for parsing.
+  // Remove noise — but KEEP ld+json scripts.
   $("style, nav, footer, header, aside, .cookie, .gdpr, .banner, .ads").remove();
   $("script:not([type='application/ld+json'])").remove();
 
   const bodyText = $("body").text().replace(/\s+/g, " ").trim();
 
-  // JSON-LD Event schema — most reliable source.
   const jsonLd = extractFromJsonLd($, pageUrl);
-
-  const title   = extractTitle($);
-  const dates   = extractDates(bodyText);
-  const geo     = extractLocation($, bodyText, pageUrl, jsonLd);
-  const genre   = extractGenre(bodyText, title);
+  const title  = extractTitle($);
+  const dates  = extractDates(bodyText);
+  const geo    = extractLocation($, pageUrl, jsonLd);
+  const genre  = extractGenre(bodyText, title);
 
   const applicationUrl = extractApplicationUrl($, pageUrl);
   const website = jsonLd.website || extractWebsite($, pageUrl);
-
-  // Requirement #4: never leave application_url null when website exists.
   const finalApplicationUrl = applicationUrl || website || null;
 
   return {
@@ -158,8 +126,7 @@ function extractFromJsonLd($, pageUrl) {
 
   $('script[type="application/ld+json"]').each((_, el) => {
     try {
-      let raw = $(el).html() ?? "";
-      let data = JSON.parse(raw);
+      let data = JSON.parse($(el).html() ?? "");
       if (Array.isArray(data)) data = data[0];
       if (!data || typeof data !== "object") return;
 
@@ -167,30 +134,26 @@ function extractFromJsonLd($, pageUrl) {
       const isEvent = /^(MusicEvent|Event|Festival|SocialEvent|MusicFestival)$/i.test(type);
       if (!isEvent) return;
 
-      // Location
       const loc = data.location;
       if (loc) {
         if (typeof loc === "string") {
           const parts = loc.split(",").map(s => s.trim());
-          result.city    = parts[0] || null;
-          result.country = parts[parts.length - 1] || null;
+          result.city    = sanitizeGeo(parts[0]) || null;
+          result.country = sanitizeGeo(parts[parts.length - 1]) || null;
         } else if (loc.address) {
-          result.city    = loc.address.addressLocality || loc.address.addressRegion || null;
-          result.country = loc.address.addressCountry  || null;
+          result.city    = sanitizeGeo(loc.address.addressLocality || loc.address.addressRegion) || null;
+          result.country = sanitizeGeo(loc.address.addressCountry) || null;
         } else if (loc.name) {
           const parts = String(loc.name).split(",").map(s => s.trim());
           if (parts.length >= 2) {
-            result.city    = parts[0];
-            result.country = parts[parts.length - 1];
+            result.city    = sanitizeGeo(parts[0]) || null;
+            result.country = sanitizeGeo(parts[parts.length - 1]) || null;
           }
         }
       }
 
-      // Dates
       if (data.startDate) result.festivalStart = String(data.startDate).slice(0, 10);
       if (data.endDate)   result.festivalEnd   = String(data.endDate).slice(0, 10);
-
-      // Website
       if (data.url) {
         try { result.website = new URL(data.url).href; } catch { /* ignore */ }
       }
@@ -206,6 +169,11 @@ function extractTitle($) {
   const h1 = $("h1").first().text().trim();
   if (h1 && h1.length > 3 && h1.length < 120) return cleanText(h1);
 
+  const ogTitle = $('meta[property="og:title"]').attr("content")?.trim();
+  if (ogTitle && ogTitle.length > 3 && ogTitle.length < 120) {
+    return cleanText(ogTitle.split(/[|\-–—]/)[0].trim());
+  }
+
   const title = $("title").text().trim();
   if (title) return cleanText(title.split(/[|\-–—]/)[0].trim());
 
@@ -213,65 +181,67 @@ function extractTitle($) {
 }
 
 // ─── Location ────────────────────────────────────────────────────────────────
+//
+// STRICT: only extract from structured data sources. Never infer from prose.
+//
+// Sources tried (in priority order):
+//   1. JSON-LD Event/MusicEvent schema
+//   2. Schema.org microdata attributes (itemprop)
+//   3. OpenGraph country-name / geo.region meta tags
+//   4. ccTLD of the page URL (last resort, no city)
+//
+// Steps 4 and 5 (prose regex matching) have been intentionally removed.
+// They produced values like "please contact online" and
+// "All Scotland For further information" — sentences captured by greedy
+// regexes on unstructured page text. Country/city must come from structured
+// markup or not at all.
 
-function extractLocation($, bodyText, pageUrl, jsonLd) {
-  // 1. JSON-LD (already parsed above — most reliable).
+function extractLocation($, pageUrl, jsonLd) {
+  // 1. JSON-LD (highest confidence — machine-generated by site CMS)
   if (jsonLd.city || jsonLd.country) {
     return { city: jsonLd.city, country: jsonLd.country };
   }
 
-  // 2. Schema.org microdata attributes.
-  const mdCountry = $('[itemprop="addressCountry"]').first().text().trim() ||
-                    $('[itemprop="addressCountry"]').first().attr("content") || "";
-  const mdCity    = $('[itemprop="addressLocality"], [itemprop="addressRegion"]').first().text().trim() ||
-                    $('[itemprop="addressLocality"]').first().attr("content") || "";
+  // 2. Schema.org microdata
+  const mdCountry = (
+    $('[itemprop="addressCountry"]').first().attr("content") ||
+    $('[itemprop="addressCountry"]').first().text()
+  ).trim();
+  const mdCity = (
+    $('[itemprop="addressLocality"]').first().attr("content") ||
+    $('[itemprop="addressLocality"]').first().text() ||
+    $('[itemprop="addressRegion"]').first().attr("content") ||
+    $('[itemprop="addressRegion"]').first().text()
+  ).trim();
+
   if (mdCountry || mdCity) {
-    return { city: mdCity || null, country: mdCountry || null };
+    return {
+      city:    sanitizeGeo(mdCity)    || null,
+      country: sanitizeGeo(mdCountry) || null,
+    };
   }
 
-  // 3. OpenGraph / geo meta tags.
-  const ogLocation = $('meta[property="og:location"]').attr("content") ||
-                     $('meta[name="geo.region"]').attr("content") || "";
+  // 3. OpenGraph / geo meta tags
+  const geoRegion = $('meta[name="geo.region"]').attr("content") || "";
+  if (geoRegion) {
+    const code = geoRegion.split("-")[0].toUpperCase();
+    const country = ISO2_COUNTRY[code] || null;
+    if (country) return { city: null, country };
+  }
+
+  const ogCountry = $('meta[property="og:country-name"]').attr("content")?.trim() || "";
+  if (ogCountry) return { city: null, country: sanitizeGeo(ogCountry) || null };
+
+  const ogLocation = $('meta[property="og:location"]').attr("content")?.trim() || "";
   if (ogLocation) {
     const parts = ogLocation.split(",").map(s => s.trim());
-    if (parts.length >= 2) return { city: parts[0], country: parts[1] };
-    return { city: null, country: parts[0] || null };
+    return {
+      city:    sanitizeGeo(parts[0]) || null,
+      country: sanitizeGeo(parts[parts.length - 1]) || null,
+    };
   }
 
-  // 4. Text pattern: "Location: City, Country" within first 3000 chars.
-  const snippet = bodyText.slice(0, 3000);
-  const locMatch = snippet.match(
-    /(?:location|venue|city|held in|takes place in|based in|hosted in|organized in)[:\s]+([A-Z][a-zA-Z\s\-]+),\s*([A-Z][a-zA-Z\s]+)/i
-  );
-  if (locMatch) {
-    return { city: cleanText(locMatch[1]), country: cleanText(locMatch[2]) };
-  }
-
-  // "City, Country" after a known location preposition.
-  const inMatch = snippet.match(/\b(?:in|at)\s+([A-Z][a-zA-Z\s]{2,30}),\s*([A-Z][a-zA-Z\s]{3,30})\b/);
-  if (inMatch) {
-    const [, cityPart, countryPart] = inMatch;
-    const known = COUNTRY_PATTERNS.find(
-      ([pat]) => countryPart.toLowerCase().trim() === pat
-    );
-    if (known) return { city: cleanText(cityPart), country: known[1] };
-  }
-
-  // 5. Country name in body text near a location-context word.
-  const lower = bodyText.toLowerCase();
-  for (const [pattern, canonical] of COUNTRY_PATTERNS) {
-    let pos = 0;
-    while (true) {
-      const idx = lower.indexOf(pattern, pos);
-      if (idx === -1) break;
-      const window = lower.slice(Math.max(0, idx - 250), idx + 250);
-      const hasContext = LOCATION_CONTEXT_WORDS.some(ctx => window.includes(ctx));
-      if (hasContext) return { city: null, country: canonical };
-      pos = idx + 1;
-    }
-  }
-
-  // 6. TLD-based country — last resort, no city.
+  // 4. ccTLD — last resort, provides country only (no city)
   try {
     const hostname = new URL(pageUrl).hostname;
     const match = Object.entries(TLD_COUNTRY).find(([tld]) => hostname.endsWith(tld));
@@ -284,7 +254,6 @@ function extractLocation($, bodyText, pageUrl, jsonLd) {
 // ─── Genre ───────────────────────────────────────────────────────────────────
 
 function extractGenre(bodyText, title) {
-  // Title/H1 is more reliable than body text.
   const titleLower = (title ?? "").toLowerCase();
   for (const genre of GENRE_KEYWORDS) {
     if (titleLower.includes(genre)) return capitalise(genre);
@@ -338,13 +307,13 @@ function extractWebsite($, pageUrl) {
 
 function extractSocialLinks($) {
   const platforms = {
-    instagram: /instagram\.com/,
-    facebook:  /facebook\.com/,
-    twitter:   /twitter\.com|x\.com/,
-    youtube:   /youtube\.com/,
+    instagram:  /instagram\.com/,
+    facebook:   /facebook\.com/,
+    twitter:    /twitter\.com|x\.com/,
+    youtube:    /youtube\.com/,
     soundcloud: /soundcloud\.com/,
-    spotify:   /spotify\.com/,
-    tiktok:    /tiktok\.com/,
+    spotify:    /spotify\.com/,
+    tiktok:     /tiktok\.com/,
   };
   const links = {};
   $("a[href]").each((_, el) => {
