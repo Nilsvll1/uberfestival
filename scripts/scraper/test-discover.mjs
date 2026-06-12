@@ -16,6 +16,7 @@ import { classifyPage, ACCEPT_THRESHOLD } from "./lib/classify-page.mjs";
 const FESTIVAL_LINK_KEYWORDS = [
   "festival", "music", "call", "submission", "apply", "open call",
   "showcase", "performance", "opportunity", "residency",
+  "grant", "award", "competition", "fund",
 ];
 const SKIP_PATTERNS = [
   /\/(about|contact|privacy|terms|faq|login|signup|register|search|tag|category|page\/\d)/i,
@@ -24,23 +25,25 @@ const SKIP_PATTERNS = [
 ];
 
 const SOURCES = [
-  { name: "Musical America",             url: "https://www.musicalamerica.com/news/" },
-  { name: "Ditto Music Blog",            url: "https://dittomusic.com/en/blog/" },
-  { name: "iMusician Blog",              url: "https://imusician.pro/en/resources/blog/" },
-  { name: "CD Baby DIY Musician",        url: "https://diymusician.cdbaby.com/" },
-  { name: "Hypebot",                     url: "https://www.hypebot.com/hypebot/" },
-  { name: "Bandzoogle Blog",             url: "https://bandzoogle.com/blog/" },
-  { name: "Music Week Talent",           url: "https://www.musicweek.com/talent/" },
-  { name: "Americana Music Association", url: "https://americanamusic.org/news" },
-  { name: "Help Musicians UK",           url: "https://helpmusicians.org.uk/news/" },
-  { name: "CaFE – Call for Entry",       url: "https://www.callforentry.org/" },
-  { name: "Jazz Corner",                 url: "https://www.jazzcorner.com/" },
-  { name: "Songwriting Magazine UK",     url: "https://www.songwritingmagazine.co.uk/competitions/" },
-  { name: "Sentric Music Blog",          url: "https://sentricmusic.com/blog/" },
-  { name: "SongKick Festivals",          url: "https://www.songkick.com/festivals" },
-  { name: "BBC Introducing",             url: "https://www.bbc.co.uk/music/introducing" },
-  { name: "DIY Magazine Artists",        url: "https://diymag.com/artists/" },
-  { name: "Indie Bible Blog",            url: "https://indiebible.com/blog/" },
+  // Artist residency open calls — largest source (~120 individual pages, global)
+  { name: "Artist Communities Alliance",         url: "https://www.artistcommunities.org/directory/open-calls" },
+  // Music export & national showcase programs
+  { name: "Music Export Denmark",                url: "https://musicexportdenmark.dk/funding-opportunities/" },
+  // National arts funding bodies
+  { name: "Arts Council of Northern Ireland",    url: "https://www.artscouncil-ni.org/funding/" },
+  { name: "SMIA – Award Submissions",            url: "https://www.smia.org.uk/opportunity-type/award-submissions/" },
+  { name: "Sound and Music (UK)",                url: "https://soundandmusic.org/opportunities/" },
+  { name: "PRS Foundation – Open Fund",          url: "https://prsfoundation.com/funding-support/funding-for-music-creators/open-fund/" },
+  { name: "PRS Foundation – Early Career",       url: "https://prsfoundation.com/funding-support/funding-for-music-creators/early-career/" },
+  { name: "Youth Music UK",                      url: "https://youthmusic.org.uk/funding" },
+  // Major festival & showcase applications
+  { name: "SXSW Music Applications",            url: "https://www.sxsw.com/applications/music/" },
+  { name: "AmericanaFest",                       url: "https://americanamusic.org/" },
+  { name: "The Great Escape Festival",           url: "https://greatescapefestival.com/" },
+  // Competitions & awards
+  { name: "Songwriting Magazine UK",             url: "https://www.songwritingmagazine.co.uk/competitions/" },
+  { name: "International Songwriting Competition", url: "https://www.songwritingcompetition.com/" },
+  { name: "Independent Music Awards",            url: "https://www.independentmusicawards.com/" },
 ];
 
 const singleSource = process.argv

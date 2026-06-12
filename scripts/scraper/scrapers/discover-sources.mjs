@@ -21,6 +21,7 @@ import { classifyPage } from "../lib/classify-page.mjs";
 const FESTIVAL_LINK_KEYWORDS = [
   "festival", "music", "call", "submission", "apply", "open call",
   "showcase", "performance", "opportunity", "residency",
+  "grant", "award", "competition", "fund",
 ];
 
 const SKIP_PATTERNS = [

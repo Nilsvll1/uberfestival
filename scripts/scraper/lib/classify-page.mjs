@@ -62,6 +62,7 @@ const ARTICLE_TITLE_RES = [
 // ── Positive: strong signals that this is a real opportunity ─────────────────
 
 const OPPORTUNITY_SIGNALS = [
+  // Direct apply / submit language
   "apply now", "apply today", "submit your", "open call",
   "call for entries", "call for artists", "call for applications",
   "call for submissions", "call for performers", "call for musicians",
@@ -72,12 +73,28 @@ const OPPORTUNITY_SIGNALS = [
   "artist residency", "music residency", "festival application",
   "showcase application", "festival submission", "open for applications",
   "emerging artists", "unsigned artists", "open auditions",
+  // Awards / competitions / showcase submissions
+  "award submissions", "showcase submissions", "competition entry",
+  "competition entries", "nominations open", "accepting nominations",
+  "award submission", "award entry", "enter the competition",
+  // Grants / funding vocabulary (arts councils, music foundations)
+  "grant application", "apply for funding", "funding deadline",
+  "apply for a grant", "bursary", "artist bursary", "music bursary",
+  "artist grant", "music grant",
+  // Residency (covers "artist in residence / AIR" programmes)
+  "residency application", "apply for a residency",
+  "artist in residence", "artists in residence",
+  "apply to this residency", "apply for the residency",
+  // Program / cohort applications (fellowships, music export programs)
+  "apply to join", "apply to this program", "apply to our program",
 ];
 
 // Keywords in the title / H1 that affirm this is a festival/opportunity page.
 const FESTIVAL_TITLE_KEYWORDS = [
   "festival", "open call", "call for", "showcase", "residency",
   "artist call", "submission", "audition", "music event",
+  // Awards and competitions are also valid opportunities
+  "competition", "award", "grant", "bursary",
 ];
 
 // ── Negative: tool / SaaS / music-industry-marketing signals ─────────────────
