@@ -2,6 +2,7 @@ export type Language = "en" | "fr";
 
 export type Translations = {
   nav: {
+    explore: string;
     submit: string;
     login: string;
   };

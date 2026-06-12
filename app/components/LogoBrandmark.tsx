@@ -1,11 +1,12 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { motion } from "framer-motion";
 
-export default function LogoBrandmark({ name }: { name: string }) {
+export default function LogoBrandmark({ name, href = "/" }: { name: string; href?: string }) {
   return (
-    <div className="flex items-center gap-2.5 select-none">
+    <Link href={href} className="flex items-center gap-2.5 select-none" style={{ textDecoration: "none" }}>
       <motion.div
         whileHover={{ scale: 1.07 }}
         whileTap={{ scale: 0.96 }}
@@ -40,6 +41,6 @@ export default function LogoBrandmark({ name }: { name: string }) {
       >
         {name}
       </span>
-    </div>
+    </Link>
   );
 }

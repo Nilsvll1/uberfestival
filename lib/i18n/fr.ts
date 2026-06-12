@@ -2,6 +2,7 @@ import type { Translations } from "./types";
 
 export const fr: Translations = {
   nav: {
+    explore: "Explorer",
     submit: "Soumettre un festival",
     login: "Connexion",
   },

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Language } from "../../lib/i18n";
 import { getTranslations } from "../../lib/i18n";
 import { createClient } from "../../lib/supabase-server";
@@ -24,11 +25,19 @@ export default async function Header({ lang }: { lang: Language }) {
       }}
     >
       <div className="max-w-screen-xl mx-auto px-5 h-full flex items-center gap-3">
-        <LogoBrandmark name="UberFestival" />
+        <LogoBrandmark name="UberFestival" href="/explore" />
 
         <div className="flex-1" />
 
         <nav className="flex items-center gap-2">
+          <Link
+            href="/explore"
+            className="hidden sm:inline-flex items-center gap-1.5 rounded-full font-medium transition-colors hover:text-[var(--text-primary)]"
+            style={{ fontSize: "13px", color: "var(--text-secondary)", padding: "4px 10px" }}
+          >
+            {t.nav.explore}
+          </Link>
+
           {/* Submit a festival — only show when logged out to keep header clean */}
           {!user && (
             <a
