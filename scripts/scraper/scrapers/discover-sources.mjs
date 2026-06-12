@@ -28,6 +28,8 @@ const SKIP_PATTERNS = [
   /\/(about|contact|privacy|terms|faq|login|signup|register|search|tag|category|page\/\d)/i,
   /^(mailto|tel|javascript):/i,
   /#$/,
+  // Profile and account pages — musician bios, user dashboards, auth
+  /\/(musician|performer|profile|user|account|dashboard|my-|sign-?in)s?\//i,
 ];
 
 const BATCH_SIZE = 4;

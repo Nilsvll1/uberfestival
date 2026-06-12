@@ -4,8 +4,14 @@
  * Quality gate for discovered pages. Decides whether a page is an actual
  * festival / open-call opportunity or should be discarded.
  *
- * Scoring starts at 40 (below the accept threshold). The page must
- * accumulate enough positive signals to cross 55.
+ * Scoring starts at 40 (below the accept threshold of 60). A page must
+ * accumulate enough positive signals to cross 60.
+ *
+ * Hard rejects (confidence=0) fire before scoring:
+ *   • Social media / streaming domain
+ *   • Person-name title (e.g. "Chris Walker") with no music context
+ *   • Profile / account / login page URL path
+ *   • Missing festival_name or website
  *
  * Returns: { confidence: 0–100, accept: boolean, reason: string }
  */
@@ -20,7 +26,53 @@ const BLOCKED_DOMAINS = new Set([
   "discord.com", "bandcamp.com",
 ]);
 
-// ── URL path patterns that indicate non-opportunity content ──────────────────
+// ── Instant-reject: profile, account, and login page URL paths ────────────────
+// These paths indicate artist bios, user dashboards, or auth pages — never
+// a festival or open call.
+
+const BLOCKED_PROFILE_PATH_RES = [
+  /\/musician\//i,
+  /\/performer\//i,
+  /\/profile\//i,
+  /\/user\//i,
+  /\/account\//i,
+  /\/my-/i,
+  /\/login\b/i,
+  /\/sign-?in\b/i,
+  /\/signup\b/i,
+  /\/register\b/i,
+  /\/dashboard\b/i,
+  /\/members?\//i,
+];
+
+// ── Person-name detection ─────────────────────────────────────────────────────
+// A title of exactly two capitalised words (e.g. "Chris Walker") with no
+// music / event context is almost always a musician profile page.
+
+const PERSON_NAME_RE = /^[A-Z][a-z'-]+ [A-Z][a-z'-]+$/;
+
+// Words that prove the title belongs to a festival/event, not a person.
+const PERSON_NAME_MUSIC_CONTEXT = new Set([
+  "jazz", "folk", "rock", "pop", "blues", "soul", "country", "indie",
+  "electronic", "classical", "world", "reggae", "punk", "metal", "ambient",
+  "techno", "house", "dance", "acoustic", "gospel", "latin", "afrobeat",
+  "sound", "music", "arts", "band", "song", "tune", "festival",
+  "open", "showcase", "award", "competition", "grant", "residency",
+  "ensemble", "orchestra", "quartet", "trio", "collective", "society",
+  "foundation", "institute", "academy", "project", "community", "union",
+  "network", "conference", "summit", "forum", "connect", "exchange",
+  "talent", "emerging", "artist", "musician", "singer", "composer",
+  "north", "south", "east", "west", "global", "international", "national",
+  "new", "big", "great", "free", "live", "young", "summer", "winter",
+  "spring", "annual", "series", "city",
+  // Programme/scheme words that appear in 2-word grant/funding titles
+  // e.g. "Early Career", "Next Steps", "Open Fund", "Development Programme"
+  "career", "early", "next", "step", "steps", "scheme", "programme",
+  "program", "fund", "prize", "fellowship", "access", "future", "bridge",
+  "debut", "launch", "track", "path", "momentum", "catalyst",
+]);
+
+// ── URL path patterns indicating non-opportunity content ─────────────────────
 
 const BLOCKED_PATH_RES = [
   /\/blog\//i,
@@ -59,6 +111,14 @@ const ARTICLE_TITLE_RES = [
   /^a guide to /i,
 ];
 
+// ── Exact-match generic page titles — directory/listing pages staging themselves
+const GENERIC_PAGE_TITLES = new Set([
+  "opportunities", "funding", "grants", "awards", "competitions", "residencies",
+  "programs", "programmes", "showcases", "resources", "events", "news", "blog",
+  "home", "about", "contact", "articles", "members", "listing", "directory",
+  "launching soon", "coming soon", "under construction",
+]);
+
 // ── Positive: strong signals that this is a real opportunity ─────────────────
 
 const OPPORTUNITY_SIGNALS = [
@@ -93,7 +153,6 @@ const OPPORTUNITY_SIGNALS = [
 const FESTIVAL_TITLE_KEYWORDS = [
   "festival", "open call", "call for", "showcase", "residency",
   "artist call", "submission", "audition", "music event",
-  // Awards and competitions are also valid opportunities
   "competition", "award", "grant", "bursary",
 ];
 
@@ -109,8 +168,6 @@ const TOOL_SIGNALS = [
   "cancel anytime", "no credit card required",
   "try for free today", "unlimited uploads", "release your music",
   "for labels", "for artists tools",
-  // Platform-for-organizers signals (CaFE, etc.) — these pitch to event
-  // organizers, not to artists applying to festivals.
   "manage your call", "manage your submission", "manage your open call",
   "manage your entry", "host your call for", "create your call for",
   "software for organizing", "platform for organizers",
@@ -118,7 +175,7 @@ const TOOL_SIGNALS = [
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const ACCEPT_THRESHOLD = 55;
+export const ACCEPT_THRESHOLD = 60;
 
 /**
  * @param {string} url
@@ -129,7 +186,7 @@ export function classifyPage(url, extracted) {
   let score = 40;
   const notes = [];
 
-  // ── Hard requirements ─────────────────────────────────────────────────────
+  // ── Hard requirement: extracted fields ────────────────────────────────────
   if (!extracted.festival_name) {
     return { confidence: 0, accept: false, reason: "no festival_name extracted" };
   }
@@ -137,29 +194,50 @@ export function classifyPage(url, extracted) {
     return { confidence: 0, accept: false, reason: "no website or application_url" };
   }
 
-  // ── Domain block ──────────────────────────────────────────────────────────
+  // ── Hard reject: generic listing/directory page title ────────────────────
+  if (GENERIC_PAGE_TITLES.has(extracted.festival_name.trim().toLowerCase())) {
+    return { confidence: 0, accept: false, reason: `generic page title: "${extracted.festival_name}"` };
+  }
+
+  // ── Hard reject: person name pattern ─────────────────────────────────────
+  // "Chris Walker", "Dave Shank", "Featured Articles" → confidence=0
+  // Exception: a title word is a known music/event context word.
+  if (PERSON_NAME_RE.test(extracted.festival_name.trim())) {
+    const words = extracted.festival_name.toLowerCase().split(/\s+/);
+    if (!words.some(w => PERSON_NAME_MUSIC_CONTEXT.has(w))) {
+      return { confidence: 0, accept: false, reason: "title matches person name (no music context)" };
+    }
+  }
+
+  // ── Parse URL ────────────────────────────────────────────────────────────
   let hostname = "";
   let pathname = "";
   try {
     const parsed = new URL(url);
     hostname = parsed.hostname.replace(/^www\./, "");
     pathname = parsed.pathname;
-  } catch { /* malformed URL — continue with empty strings */ }
+  } catch { /* malformed URL */ }
 
+  // ── Hard reject: blocked social media / streaming domain ──────────────────
   const isDomainBlocked = BLOCKED_DOMAINS.has(hostname) ||
     [...BLOCKED_DOMAINS].some(d => hostname.endsWith(`.${d}`));
   if (isDomainBlocked) {
     return { confidence: 0, accept: false, reason: `blocked domain: ${hostname}` };
   }
 
-  // ── URL path block ────────────────────────────────────────────────────────
+  // ── Hard reject: profile / account / login page ───────────────────────────
+  if (BLOCKED_PROFILE_PATH_RES.some(re => re.test(pathname))) {
+    return { confidence: 0, accept: false, reason: `profile/account/login page: ${pathname}` };
+  }
+
+  // ── URL path penalty ─────────────────────────────────────────────────────
   const matchedPath = BLOCKED_PATH_RES.find(re => re.test(pathname));
   if (matchedPath) {
     score -= 30;
     notes.push(`non-opportunity path: ${pathname}`);
   }
 
-  // ── Title quality ─────────────────────────────────────────────────────────
+  // ── Title quality ────────────────────────────────────────────────────────
   const title = extracted.festival_name.toLowerCase();
 
   if (ARTICLE_TITLE_RES.some(re => re.test(title))) {
@@ -171,7 +249,7 @@ export function classifyPage(url, extracted) {
     notes.push("festival/opportunity keyword in title");
   }
 
-  // ── Content analysis ──────────────────────────────────────────────────────
+  // ── Content: opportunity signals ─────────────────────────────────────────
   const body = (extracted.raw_text ?? "").toLowerCase();
 
   const oppHits = OPPORTUNITY_SIGNALS.filter(s => body.includes(s));
@@ -189,6 +267,7 @@ export function classifyPage(url, extracted) {
     notes.push("no opportunity signals found");
   }
 
+  // ── Content: tool / SaaS signals ─────────────────────────────────────────
   const toolHits = TOOL_SIGNALS.filter(s => body.includes(s));
   if (toolHits.length >= 3) {
     score -= 40;
@@ -201,13 +280,13 @@ export function classifyPage(url, extracted) {
     notes.push(`tool signal: "${toolHits[0]}"`);
   }
 
-  // ── Structured data bonuses ───────────────────────────────────────────────
+  // ── Structured data ──────────────────────────────────────────────────────
   if (extracted.submission_deadline) { score += 15; notes.push("has deadline"); }
   if (extracted.country)             { score += 10; notes.push("has country"); }
-  else                               { score -=  5; notes.push("no country"); }
+  else                               { score -= 15; notes.push("no country — heavy penalty"); }
   if (extracted.application_url)     { score +=  5; notes.push("has apply URL"); }
 
-  // ── Clamp and decide ──────────────────────────────────────────────────────
+  // ── Clamp and decide ─────────────────────────────────────────────────────
   score = Math.max(0, Math.min(100, score));
 
   return {

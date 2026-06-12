@@ -56,6 +56,8 @@ INSERT INTO scrape_sources (name, url, is_active) VALUES
    true),
 
   -- Youth Music UK: distributes £10 M/yr to music projects; opportunity pages.
+  -- Note: Help Musicians UK removed — its pages are support/service pages,
+  -- not festival or open-call opportunities, causing false positives.
   ('Youth Music UK',
    'https://youthmusic.org.uk/funding',
    true),

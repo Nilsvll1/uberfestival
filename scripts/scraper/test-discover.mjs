@@ -22,6 +22,8 @@ const SKIP_PATTERNS = [
   /\/(about|contact|privacy|terms|faq|login|signup|register|search|tag|category|page\/\d)/i,
   /^(mailto|tel|javascript):/i,
   /#$/,
+  // Profile and account pages — musician bios, user dashboards, auth
+  /\/(musician|performer|profile|user|account|dashboard|my-|sign-?in)s?\//i,
 ];
 
 const SOURCES = [
@@ -35,7 +37,7 @@ const SOURCES = [
   { name: "Sound and Music (UK)",                url: "https://soundandmusic.org/opportunities/" },
   { name: "PRS Foundation – Open Fund",          url: "https://prsfoundation.com/funding-support/funding-for-music-creators/open-fund/" },
   { name: "PRS Foundation – Early Career",       url: "https://prsfoundation.com/funding-support/funding-for-music-creators/early-career/" },
-  { name: "Youth Music UK",                      url: "https://youthmusic.org.uk/funding" },
+  // Help Musicians UK removed: produces support/service page false positives.
   // Major festival & showcase applications
   { name: "SXSW Music Applications",            url: "https://www.sxsw.com/applications/music/" },
   { name: "AmericanaFest",                       url: "https://americanamusic.org/" },
