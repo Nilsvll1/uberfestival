@@ -3,7 +3,9 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from "react-leaflet";
+import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
+import "leaflet.markercluster/dist/MarkerCluster.css";
 import type { Festival } from "../../lib/types";
 import { genreColor } from "../../lib/utils";
 
@@ -29,6 +31,32 @@ function createMarkerIcon(accentColor: string, active: boolean) {
     className: "",
     iconSize: [size, size],
     iconAnchor: [offset, offset],
+  });
+}
+
+function createClusterIcon(cluster: L.MarkerCluster) {
+  const count = cluster.getChildCount();
+  const size = count < 10 ? 32 : count < 100 ? 38 : 44;
+  const half = size / 2;
+  const fontSize = count < 10 ? 13 : count < 100 ? 12 : 11;
+  return L.divIcon({
+    html: `<div style="
+      width:${size}px;height:${size}px;
+      border-radius:50%;
+      background:#6366F1;
+      border:2.5px solid #fff;
+      box-shadow:0 2px 8px rgba(0,0,0,0.22),0 0 0 4px rgba(99,102,241,0.18);
+      display:flex;align-items:center;justify-content:center;
+      color:#fff;
+      font-size:${fontSize}px;
+      font-weight:700;
+      font-family:system-ui,-apple-system,sans-serif;
+      letter-spacing:-0.02em;
+      cursor:pointer;
+    ">${count}</div>`,
+    className: "",
+    iconSize: [size, size],
+    iconAnchor: [half, half],
   });
 }
 
@@ -82,41 +110,49 @@ export default function FestivalMap({
 
       <MapController festivals={festivals} hoveredId={hoveredId} />
 
-      {festivals.map((festival) => {
-        if (!festival.latitude || !festival.longitude) return null;
+      <MarkerClusterGroup
+        iconCreateFunction={createClusterIcon}
+        maxClusterRadius={60}
+        showCoverageOnHover={false}
+        animate
+        chunkedLoading
+      >
+        {festivals.map((festival) => {
+          if (!festival.latitude || !festival.longitude) return null;
 
-        const color      = festival.category ? genreColor(festival.category) : null;
-        const accent     = color?.text ?? "#6366F1";
-        const isActive   = hoveredId === festival.id;
-        const icon       = createMarkerIcon(accent, isActive);
+          const color    = festival.category ? genreColor(festival.category) : null;
+          const accent   = color?.text ?? "#6366F1";
+          const isActive = hoveredId === festival.id;
+          const icon     = createMarkerIcon(accent, isActive);
 
-        return (
-          <Marker
-            key={festival.id}
-            position={[festival.latitude, festival.longitude]}
-            icon={icon}
-            eventHandlers={{
-              click:     () => router.push(`/festival/${festival.id}`),
-              mouseover: () => onHoverChange?.(festival.id),
-              mouseout:  () => onHoverChange?.(null),
-            }}
-          >
-            <Tooltip
-              direction="top"
-              offset={[0, -10]}
-              opacity={1}
-              className="festival-tooltip"
+          return (
+            <Marker
+              key={festival.id}
+              position={[festival.latitude, festival.longitude]}
+              icon={icon}
+              eventHandlers={{
+                click:     () => router.push(`/festival/${festival.id}`),
+                mouseover: () => onHoverChange?.(festival.id),
+                mouseout:  () => onHoverChange?.(null),
+              }}
             >
-              <span className="festival-tooltip-name">{festival.festival_name}</span>
-              {(festival.city || festival.country) && (
-                <span className="festival-tooltip-location">
-                  {[festival.city, festival.country].filter(Boolean).join(", ")}
-                </span>
-              )}
-            </Tooltip>
-          </Marker>
-        );
-      })}
+              <Tooltip
+                direction="top"
+                offset={[0, -10]}
+                opacity={1}
+                className="festival-tooltip"
+              >
+                <span className="festival-tooltip-name">{festival.festival_name}</span>
+                {(festival.city || festival.country) && (
+                  <span className="festival-tooltip-location">
+                    {[festival.city, festival.country].filter(Boolean).join(", ")}
+                  </span>
+                )}
+              </Tooltip>
+            </Marker>
+          );
+        })}
+      </MarkerClusterGroup>
     </MapContainer>
   );
 }
