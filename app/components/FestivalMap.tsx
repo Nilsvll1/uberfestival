@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
@@ -34,7 +34,7 @@ function createMarkerIcon(accentColor: string, active: boolean) {
   });
 }
 
-function createClusterIcon(cluster: L.MarkerCluster) {
+function createClusterIcon(cluster: { getChildCount: () => number }) {
   const count = cluster.getChildCount();
   const size = count < 10 ? 32 : count < 100 ? 38 : 44;
   const half = size / 2;
@@ -94,6 +94,16 @@ export default function FestivalMap({
 }) {
   const router = useRouter();
 
+  // Defer marker rendering until MarkerClusterGroup is mounted on the map.
+  // Without this, all 1,106 marker useEffects fire before the cluster's own
+  // useEffect, so this._map is null and every addLayer call is synchronous —
+  // blocking the main thread for several seconds.
+  const [clusterReady, setClusterReady] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setClusterReady(true), 0);
+    return () => clearTimeout(id);
+  }, []);
+
   return (
     <MapContainer
       center={center}
@@ -117,7 +127,7 @@ export default function FestivalMap({
         animate
         chunkedLoading
       >
-        {festivals.map((festival) => {
+        {clusterReady && festivals.map((festival) => {
           if (!festival.latitude || !festival.longitude) return null;
 
           const color    = festival.category ? genreColor(festival.category) : null;
