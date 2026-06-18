@@ -10,6 +10,10 @@ import { getUrgencyGroup } from "../../lib/utils";
 import FestivalMapWrapper from "./FestivalMapWrapper";
 import FilterDropdown from "./FilterDropdown";
 import FestivalCard from "./FestivalCard";
+import VirtualFestivalList, {
+  type VirtualFestivalListHandle,
+  type VirtualItem,
+} from "./VirtualFestivalList";
 import { useI18n } from "../hooks/useI18n";
 
 const listVariants = {
@@ -68,10 +72,10 @@ export default function SearchableFestivals({
   const [urgencyTab,  setUrgencyTab]  = useState<UrgencyTab>("all");
   const [hoveredId,   setHoveredId]   = useState<number | null>(null);
 
-  const searchRef    = useRef<HTMLInputElement>(null);
-  const mobileSearch = useRef<HTMLInputElement>(null);
-  const cardElRefs   = useRef<Map<number, HTMLLIElement>>(new Map());
-  const didMount     = useRef(false);
+  const searchRef      = useRef<HTMLInputElement>(null);
+  const mobileSearch   = useRef<HTMLInputElement>(null);
+  const desktopListRef = useRef<VirtualFestivalListHandle>(null);
+  const didMount       = useRef(false);
 
   const countries   = useMemo(() => [...new Set(festivals.map(f => f.country).filter(Boolean))].sort() as string[], [festivals]);
   const categories  = useMemo(() => [...new Set(festivals.map(f => f.category).filter(Boolean))].sort() as string[], [festivals]);
@@ -118,6 +122,33 @@ export default function SearchableFestivals({
     return URGENCY_ORDER.filter(g => map.has(g)).map(g => ({ key: g, items: map.get(g)! }));
   }, [filtered, urgencyTab, sort, today]);
 
+  // Flat items array for the desktop virtual list, mirroring the grouped/flat structure.
+  const virtualItems = useMemo<VirtualItem[]>(() => {
+    if (groups) {
+      const items: VirtualItem[] = [];
+      for (const group of groups) {
+        items.push({
+          type: "header",
+          label: h.urgencyGroups[
+            group.key === "this-week"   ? "thisWeek"  :
+            group.key === "this-month"  ? "thisMonth" :
+            group.key === "upcoming"    ? "upcoming"  :
+            group.key === "no-deadline" ? "noDeadline" :
+            "expired"
+          ],
+          count: group.items.length,
+          isHot: group.key === "this-week",
+        });
+        for (let i = 0; i < group.items.length; i++) {
+          items.push({ type: "card", festival: group.items[i], listIndex: i });
+        }
+      }
+      return items;
+    }
+    return filtered.map((festival, i) => ({ type: "card", festival, listIndex: i }));
+  }, [groups, filtered, h.urgencyGroups]);
+
+
   const hasFilters = query.trim() !== "" || country !== "" || category !== "" || urgencyTab !== "all";
 
   const reset = useCallback(() => {
@@ -148,10 +179,10 @@ export default function SearchableFestivals({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, country, category]);
 
-  // Scroll active card into view when hover comes from the map
+  // Scroll the virtual list to show the hovered card (when hover comes from map)
   useEffect(() => {
     if (hoveredId === null) return;
-    cardElRefs.current.get(hoveredId)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    desktopListRef.current?.scrollToFestival(hoveredId);
   }, [hoveredId]);
 
   const hasSomeHover = hoveredId !== null;
@@ -406,92 +437,24 @@ export default function SearchableFestivals({
             </div>
           </div>
 
-          {/* ── Scrollable list ────────────────────────────────── */}
+          {/* ── Scrollable list (virtualized) ─────────────────── */}
           <div className="relative flex-1 min-h-0">
-            <div className="h-full overflow-y-auto px-4 py-3">
-              {filtered.length === 0 ? (
+            {filtered.length === 0 ? (
+              <div className="h-full overflow-y-auto px-4 py-3">
                 <EmptyState hasFilters={hasFilters} onReset={reset} t={t.home} />
-              ) : (
-                <motion.ul
-                  key={`${query}-${country}-${category}-${sort}-${urgencyTab}`}
-                  className="flex flex-col gap-2.5 pb-12"
-                  variants={listVariants}
-                  initial="hidden"
-                  animate="show"
-                >
-                  {groups ? (
-                    // Grouped view: section headers + cards
-                    groups.map(group => (
-                      <React.Fragment key={group.key}>
-                        <motion.li
-                          key={`hdr-${group.key}`}
-                          variants={itemVariants}
-                          style={{ listStyle: "none" }}
-                        >
-                          <GroupHeader
-                            label={h.urgencyGroups[
-                              group.key === "this-week"  ? "thisWeek"  :
-                              group.key === "this-month" ? "thisMonth" :
-                              group.key === "upcoming"   ? "upcoming"  :
-                              group.key === "no-deadline"? "noDeadline":
-                              "expired"
-                            ]}
-                            count={group.items.length}
-                            isHot={group.key === "this-week"}
-                          />
-                        </motion.li>
-                        {group.items.map((festival, index) => (
-                          <motion.li
-                            key={festival.id}
-                            variants={itemVariants}
-                            ref={el => {
-                              if (el) cardElRefs.current.set(festival.id, el as HTMLLIElement);
-                              else cardElRefs.current.delete(festival.id);
-                            }}
-                            onMouseEnter={() => setHoveredId(festival.id)}
-                            onMouseLeave={() => setHoveredId(null)}
-                          >
-                            <FestivalCard
-                              festival={festival}
-                              index={index}
-                              lang={lang}
-                              isActive={hoveredId === festival.id}
-                              isDimmed={hasSomeHover && hoveredId !== festival.id}
-                              userId={userId}
-                              initialSaved={savedIds.includes(festival.id)}
-                            />
-                          </motion.li>
-                        ))}
-                      </React.Fragment>
-                    ))
-                  ) : (
-                    // Flat view: A-Z or urgency-tab filtered
-                    filtered.map((festival, index) => (
-                      <motion.li
-                        key={festival.id}
-                        variants={itemVariants}
-                        ref={el => {
-                          if (el) cardElRefs.current.set(festival.id, el as HTMLLIElement);
-                          else cardElRefs.current.delete(festival.id);
-                        }}
-                        onMouseEnter={() => setHoveredId(festival.id)}
-                        onMouseLeave={() => setHoveredId(null)}
-                      >
-                        <FestivalCard
-                          festival={festival}
-                          index={index}
-                          lang={lang}
-                          isActive={hoveredId === festival.id}
-                          isDimmed={hasSomeHover && hoveredId !== festival.id}
-                          userId={userId}
-                          initialSaved={savedIds.includes(festival.id)}
-                        />
-                      </motion.li>
-                    ))
-                  )}
-                </motion.ul>
-              )}
-            </div>
+              </div>
+            ) : (
+              <VirtualFestivalList
+                ref={desktopListRef}
+                items={virtualItems}
+                hoveredId={hoveredId}
+                hasSomeHover={hasSomeHover}
+                userId={userId}
+                savedIds={savedIds}
+                lang={lang}
+                onHoverChange={setHoveredId}
+              />
+            )}
             {/* Scroll fade */}
             <div
               className="pointer-events-none absolute bottom-0 left-0 right-0"
