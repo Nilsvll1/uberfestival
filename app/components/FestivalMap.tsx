@@ -106,7 +106,7 @@ const MemoMarker = memo(function MemoMarker({
   );
 });
 
-export type MapBounds = { north: number; south: number; east: number; west: number };
+export type MapBounds = { north: number; south: number; east: number; west: number; zoom: number };
 
 function MapController({
   festivals,
@@ -133,7 +133,7 @@ function MapController({
     if (!onBoundsChange) return;
     const emit = () => {
       const b = map.getBounds();
-      onBoundsChange({ north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest() });
+      onBoundsChange({ north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest(), zoom: map.getZoom() });
     };
     emit();
     map.on("moveend", emit);

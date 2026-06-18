@@ -71,8 +71,9 @@ export default function SearchableFestivals({
   const [category,    setCategory]    = useState(() => searchParams.get("genre")   ?? "");
   const [sort,        setSort]        = useState<SortKey>("deadline");
   const [urgencyTab,  setUrgencyTab]  = useState<UrgencyTab>("all");
-  const [hoveredId,   setHoveredId]   = useState<number | null>(null);
-  const [mapBounds,   setMapBounds]   = useState<MapBounds | null>(null);
+  const [hoveredId,        setHoveredId]        = useState<number | null>(null);
+  const [mapBounds,        setMapBounds]        = useState<MapBounds | null>(null);
+  const [showAllInViewport, setShowAllInViewport] = useState(false);
 
   const searchRef      = useRef<HTMLInputElement>(null);
   const mobileSearch   = useRef<HTMLInputElement>(null);
@@ -139,17 +140,42 @@ export default function SearchableFestivals({
     });
   }, [filtered, mapBounds]);
 
-  // Groups for viewport-filtered festivals (mirrors `groups` logic but on viewportFiltered).
+  // Zoom-based cap: limits sidebar items at wide zoom levels to reduce render work.
+  // Reset "show all" whenever the viewport changes (zoom/pan) — the cap may be different.
+  const handleBoundsChange = useCallback((bounds: MapBounds) => {
+    setMapBounds(prev => {
+      if (prev && Math.round(prev.zoom) !== Math.round(bounds.zoom)) setShowAllInViewport(false);
+      return bounds;
+    });
+  }, []);
+
+  const sidebarCap = useMemo((): number | null => {
+    const zoom = mapBounds?.zoom ?? 2;
+    if (zoom <= 3) return 50;
+    if (zoom <= 5) return 75;
+    if (zoom <= 7) return 100;
+    return null;
+  }, [mapBounds?.zoom]);
+
+  const isCapped = !showAllInViewport && sidebarCap !== null && viewportFiltered.length > sidebarCap;
+
+  // Apply cap: prioritise urgency order (viewportFiltered is already sorted by deadline).
+  const displayedFestivals = useMemo(
+    () => (isCapped && sidebarCap ? viewportFiltered.slice(0, sidebarCap) : viewportFiltered),
+    [viewportFiltered, isCapped, sidebarCap],
+  );
+
+  // Groups for viewport-filtered festivals (mirrors `groups` logic but on displayedFestivals).
   const viewportGroups = useMemo(() => {
     if (urgencyTab !== "all" || sort !== "deadline") return null;
     const map = new Map<UrgencyGroup, Festival[]>();
-    for (const f of viewportFiltered) {
+    for (const f of displayedFestivals) {
       const g = getUrgencyGroup(f.submission_deadline, today);
       if (!map.has(g)) map.set(g, []);
       map.get(g)!.push(f);
     }
     return URGENCY_ORDER.filter(g => map.has(g)).map(g => ({ key: g, items: map.get(g)! }));
-  }, [viewportFiltered, urgencyTab, sort, today]);
+  }, [displayedFestivals, urgencyTab, sort, today]);
 
   // Flat items array for the desktop virtual list (uses viewport-filtered data).
   const virtualItems = useMemo<VirtualItem[]>(() => {
@@ -174,8 +200,8 @@ export default function SearchableFestivals({
       }
       return items;
     }
-    return viewportFiltered.map((festival, i) => ({ type: "card", festival, listIndex: i }));
-  }, [viewportGroups, viewportFiltered, h.urgencyGroups]);
+    return displayedFestivals.map((festival, i) => ({ type: "card", festival, listIndex: i }));
+  }, [viewportGroups, displayedFestivals, h.urgencyGroups]);
 
 
   const hasFilters = query.trim() !== "" || country !== "" || category !== "" || urgencyTab !== "all";
@@ -229,7 +255,7 @@ export default function SearchableFestivals({
             scrollWheelZoom
             hoveredId={hoveredId}
             onHoverChange={setHoveredId}
-            onBoundsChange={setMapBounds}
+            onBoundsChange={handleBoundsChange}
           />
         </div>
 
@@ -338,17 +364,33 @@ export default function SearchableFestivals({
               </StatPill>
             </div>
 
-            {/* Filter result count / in-view count */}
-            {(hasFilters || hasSomeHover || (mapBounds && viewportFiltered.length < filtered.length)) && (
-              <p className="mt-3 flex items-center gap-2" style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+            {/* Result count: "Showing 50 of 1,106" or "X in view" or plain filter count */}
+            {(hasFilters || hasSomeHover || (mapBounds && viewportFiltered.length < filtered.length) || isCapped) && (
+              <p className="mt-3 flex items-center gap-2 flex-wrap" style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
                 <span>
-                  <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                    {viewportFiltered.length < filtered.length ? viewportFiltered.length : filtered.length}
-                  </span>
-                  {" "}
-                  {viewportFiltered.length < filtered.length
-                    ? t.festival.inView
-                    : h.opportunities(filtered.length)}
+                  {isCapped ? (
+                    <>
+                      {"Showing "}
+                      <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                        {displayedFestivals.length.toLocaleString()}
+                      </span>
+                      {" of "}
+                      <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                        {viewportFiltered.length.toLocaleString()}
+                      </span>
+                      {viewportFiltered.length < filtered.length ? ` ${t.festival.inView}` : " festivals"}
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                        {viewportFiltered.length < filtered.length ? viewportFiltered.length : filtered.length}
+                      </span>
+                      {" "}
+                      {viewportFiltered.length < filtered.length
+                        ? t.festival.inView
+                        : h.opportunities(filtered.length)}
+                    </>
+                  )}
                 </span>
                 {hasFilters && (
                   <>
@@ -473,41 +515,64 @@ export default function SearchableFestivals({
           </div>
 
           {/* ── Scrollable list (virtualized) ─────────────────── */}
-          <div className="relative flex-1 min-h-0">
-            {filtered.length === 0 ? (
-              <div className="h-full overflow-y-auto px-4 py-3">
-                <EmptyState hasFilters={hasFilters} onReset={reset} t={t.home} />
-              </div>
-            ) : viewportFiltered.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center gap-3 px-8 text-center">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-muted)", opacity: 0.5 }}>
-                  <circle cx="12" cy="12" r="10"/>
-                  <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                </svg>
-                <p style={{ fontSize: "13px", color: "var(--text-muted)", lineHeight: 1.5 }}>
-                  {t.festival.zoomOut}
-                </p>
-              </div>
-            ) : (
-              <VirtualFestivalList
-                ref={desktopListRef}
-                items={virtualItems}
-                hoveredId={hoveredId}
-                hasSomeHover={hasSomeHover}
-                userId={userId}
-                savedIds={savedIds}
-                lang={lang}
-                onHoverChange={setHoveredId}
+          <div className="flex flex-col flex-1 min-h-0">
+            <div className="relative flex-1 min-h-0">
+              {filtered.length === 0 ? (
+                <div className="h-full overflow-y-auto px-4 py-3">
+                  <EmptyState hasFilters={hasFilters} onReset={reset} t={t.home} />
+                </div>
+              ) : viewportFiltered.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center gap-3 px-8 text-center">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-muted)", opacity: 0.5 }}>
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                  </svg>
+                  <p style={{ fontSize: "13px", color: "var(--text-muted)", lineHeight: 1.5 }}>
+                    {t.festival.zoomOut}
+                  </p>
+                </div>
+              ) : (
+                <VirtualFestivalList
+                  ref={desktopListRef}
+                  items={virtualItems}
+                  hoveredId={hoveredId}
+                  hasSomeHover={hasSomeHover}
+                  userId={userId}
+                  savedIds={savedIds}
+                  lang={lang}
+                  onHoverChange={setHoveredId}
+                />
+              )}
+              {/* Scroll fade */}
+              <div
+                className="pointer-events-none absolute bottom-0 left-0 right-0"
+                style={{
+                  height: isCapped ? 0 : 64,
+                  background: "linear-gradient(to bottom, rgba(249,249,251,0) 0%, rgba(249,249,251,0.98) 100%)",
+                }}
               />
+            </div>
+
+            {/* Show-all footer — only visible when a zoom cap is in effect */}
+            {isCapped && (
+              <button
+                onClick={() => setShowAllInViewport(true)}
+                className="shrink-0 w-full transition-colors hover:bg-black/[0.03] active:bg-black/[0.06]"
+                style={{
+                  borderTop: "1px solid rgba(0,0,0,0.07)",
+                  padding: "10px 16px",
+                  fontSize: "12px",
+                  color: "var(--text-secondary)",
+                  textAlign: "center",
+                  letterSpacing: "0.01em",
+                }}
+              >
+                <span style={{ color: "var(--accent)", fontWeight: 600 }}>
+                  Show all {viewportFiltered.length.toLocaleString()}
+                </span>
+                {" "}· {viewportFiltered.length < filtered.length ? "in view" : "festivals"}
+              </button>
             )}
-            {/* Scroll fade */}
-            <div
-              className="pointer-events-none absolute bottom-0 left-0 right-0"
-              style={{
-                height: 64,
-                background: "linear-gradient(to bottom, rgba(249,249,251,0) 0%, rgba(249,249,251,0.98) 100%)",
-              }}
-            />
           </div>
         </div>
       </div>
