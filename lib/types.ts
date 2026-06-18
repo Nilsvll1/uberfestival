@@ -9,6 +9,7 @@ export type Festival = {
   latitude: number;
   longitude: number;
   description?: string;
+  hero_image_url?: string;
   festival_start_date?: string;
   festival_end_date?: string;
   website?: string;

@@ -1,199 +1,223 @@
 /**
  * discover-sources.mjs
  *
- * For each active scrape_source, crawls the listing page, extracts candidate
- * links, fetches each one, classifies it, and stages accepted opportunities.
+ * Discovers new festivals from two source types stored in scrape_sources:
  *
- * Quality gate (classify-page.mjs):
- *   confidence < 55  → reject (never written to festival_staging)
- *   missing festival_name or website → reject
- *   blocked domain or article URL path → instant reject
+ *   source_type = 'wikipedia_list'
+ *     → Parse the wikitable on the Wikipedia list page directly.
+ *       Returns name + location + genre. Website needs a follow-up fetch.
  *
- * Results land in festival_staging for admin review.
+ *   source_type = 'directory'
+ *     → Crawl the listing page, follow links to individual festival pages,
+ *       extract festival data from each page.
+ *
+ * Every festival is validated (must be a real festival event), geocoded if
+ * coordinates are missing, then staged to festival_staging.
  */
 
 import * as cheerio from "cheerio";
-import { db } from "../lib/supabase.mjs";
-import { fetchPage } from "../lib/fetch-page.mjs";
-import { extractFestivalInfo } from "../lib/extract-festival.mjs";
-import { classifyPage } from "../lib/classify-page.mjs";
+import { db }                        from "../lib/supabase.mjs";
+import { fetchPage }                 from "../lib/fetch-page.mjs";
+import { validateFestival }          from "../lib/validate-festival.mjs";
+import { geocode }                   from "../lib/geocode.mjs";
+import { fetchWikipediaFestivalList } from "./wikipedia-festivals.mjs";
+import { extractFestivalFromPage }   from "./extract-from-page.mjs";
 
-const FESTIVAL_LINK_KEYWORDS = [
-  "festival", "music", "call", "submission", "apply", "open call",
-  "showcase", "performance", "opportunity", "residency",
-  "grant", "award", "competition", "fund",
-];
-
-const SKIP_PATTERNS = [
-  /\/(about|contact|privacy|terms|faq|login|signup|register|search|tag|category|page\/\d)/i,
-  /^(mailto|tel|javascript):/i,
-  /#$/,
-  // Profile and account pages — musician bios, user dashboards, auth
-  /\/(musician|performer|profile|user|account|dashboard|my-|sign-?in)s?\//i,
-];
-
-const BATCH_SIZE = 4;
-const BATCH_DELAY_MS = 1500;
+const BATCH_SIZE    = 4;
+const BATCH_DELAY   = 1500;
 
 export async function discoverFromSources() {
   const { data: sources, error } = await db
     .from("scrape_sources")
-    .select("id, name, url")
+    .select("id, name, url, source_type")
     .eq("is_active", true)
     .order("last_scraped_at", { ascending: true, nullsFirst: true });
 
   if (error) throw new Error(`Failed to load sources: ${error.message}`);
-  if (!sources?.length) {
-    console.log("discover: no active sources.");
-    return;
-  }
+  if (!sources?.length) { console.log("discover: no active sources."); return; }
 
-  const knownUrls = await loadKnownUrls();
+  const knownWebsites = await loadKnownWebsites();
   let totalStaged = 0;
 
   for (const source of sources) {
-    console.log(`discover: scanning ${source.name} — ${source.url}`);
-    const found = await processSource(source, knownUrls);
-    totalStaged += found;
+    console.log(`\ndiscover: [${source.source_type}] ${source.name}`);
+    console.log(`          ${source.url}`);
+
+    let staged = 0;
+
+    if (source.source_type === "wikipedia_list") {
+      staged = await processWikipediaList(source, knownWebsites);
+    } else {
+      staged = await processDirectory(source, knownWebsites);
+    }
+
+    totalStaged += staged;
 
     await db.from("scrape_sources").update({
       last_scraped_at: new Date().toISOString(),
-      festivals_found: found,
+      festivals_found: staged,
     }).eq("id", source.id);
   }
 
-  console.log(`discover: done. total staged=${totalStaged}`);
+  console.log(`\ndiscover: done — ${totalStaged} total staged`);
 }
 
-// ─── Internal ────────────────────────────────────────────────────────────────
+// ── Wikipedia list source ─────────────────────────────────────────────────────
 
-async function processSource(source, knownUrls) {
-  const { html, error } = await fetchPage(source.url);
-  if (!html) {
-    console.log(`  ✗ failed to fetch source: ${error}`);
-    return 0;
-  }
-
-  const links = extractCandidateLinks(html, source.url);
-  console.log(`  → ${links.length} candidate links`);
-
+async function processWikipediaList(source, knownWebsites) {
+  const festivals = await fetchWikipediaFestivalList(source);
   let staged = 0;
 
-  for (let i = 0; i < links.length; i += BATCH_SIZE) {
-    const batch = links.slice(i, i + BATCH_SIZE);
-    const results = await Promise.all(batch.map(url => processListing(url, knownUrls)));
+  for (let i = 0; i < festivals.length; i += BATCH_SIZE) {
+    const batch = festivals.slice(i, i + BATCH_SIZE);
+    const results = await Promise.all(batch.map(f => stageRecord(f, knownWebsites)));
     staged += results.filter(Boolean).length;
-    if (i + BATCH_SIZE < links.length) await sleep(BATCH_DELAY_MS);
+    if (i + BATCH_SIZE < festivals.length) await sleep(BATCH_DELAY);
   }
 
   return staged;
 }
 
-async function processListing(url, knownUrls) {
-  if (knownUrls.has(url)) {
-    console.log(`  ~ skip (known): ${url}`);
-    return false;
+// ── Directory source ──────────────────────────────────────────────────────────
+
+const FESTIVAL_LINK_KEYWORDS = [
+  "festival", "fest ", "fête", "feria", "foire", "fiesta",
+  "musik", "musique", "musica", "musik",
+];
+
+const SKIP_HREF_RE = [
+  /\/(about|contact|privacy|terms|faq|login|signup|register|search|tag|category|page\/\d)/i,
+  /^(mailto|tel|javascript):/i,
+  /#$/,
+];
+
+async function processDirectory(source, knownWebsites) {
+  const { html, error } = await fetchPage(source.url);
+  if (!html) { console.log(`  ✗ fetch failed: ${error}`); return 0; }
+
+  const links = extractFestivalLinks(html, source.url);
+  console.log(`  → ${links.length} festival links found`);
+
+  let staged = 0;
+
+  for (let i = 0; i < links.length; i += BATCH_SIZE) {
+    const batch = links.slice(i, i + BATCH_SIZE);
+    const results = await Promise.all(
+      batch.map(url => processFestivalPage(url, knownWebsites))
+    );
+    staged += results.filter(Boolean).length;
+    if (i + BATCH_SIZE < links.length) await sleep(BATCH_DELAY);
   }
 
-  const { html, error } = await fetchPage(url);
-  if (!html) {
-    console.log(`  ✗ fetch failed: ${url} — ${error}`);
-    return false;
-  }
-
-  // Skip pages that are clearly navigation/directory listings.
-  if (looksLikeListingPage(html)) {
-    console.log(`  ~ skip (listing page): ${url}`);
-    return false;
-  }
-
-  const info = extractFestivalInfo(html, url);
-
-  // Classify: apply quality gate before any DB write.
-  const { confidence, accept, reason } = classifyPage(url, info);
-
-  if (!accept) {
-    console.log(`  ✗ rejected (${confidence}): ${url} — ${reason}`);
-    return false;
-  }
-
-  // Ensure application_url is set (falls back to website per requirement #4).
-  if (!info.application_url && info.website) {
-    info.application_url = info.website;
-  }
-
-  const { error: insertError } = await db.from("festival_staging").insert({
-    festival_name:       info.festival_name,
-    country:             info.country,
-    city:                info.city,
-    genre:               info.genre,
-    application_url:     info.application_url,
-    submission_deadline: info.submission_deadline,
-    festival_start_date: info.festival_start_date,
-    festival_end_date:   info.festival_end_date,
-    website:             info.website,
-    social_links:        info.social_links,
-    source_url:          url,
-    raw_text:            info.raw_text,
-    status:              "pending",
-  });
-
-  if (insertError) {
-    console.log(`  ✗ insert failed: ${url} — ${insertError.message}`);
-    return false;
-  }
-
-  knownUrls.add(url);
-  const geoStr = [info.city, info.country].filter(Boolean).join(", ") || "no geo";
-  console.log(`  + staged (${confidence}): "${info.festival_name}" | ${geoStr}`);
-  return true;
+  return staged;
 }
 
-function extractCandidateLinks(html, sourceUrl) {
+function extractFestivalLinks(html, sourceUrl) {
   const $ = cheerio.load(html);
   const base = new URL(sourceUrl);
   const seen = new Set();
   const links = [];
 
   $("a[href]").each((_, el) => {
-    const text = ($(el).text() + " " + ($(el).attr("aria-label") ?? "")).toLowerCase();
     const href = $(el).attr("href") ?? "";
-    if (SKIP_PATTERNS.some(re => re.test(href))) return;
-    const hasKeyword = FESTIVAL_LINK_KEYWORDS.some(
-      kw => text.includes(kw) || href.toLowerCase().includes(kw)
+    const text = $(el).text().toLowerCase();
+
+    if (SKIP_HREF_RE.some(re => re.test(href))) return;
+
+    const lowerHref = href.toLowerCase();
+    const hasFestivalSignal = FESTIVAL_LINK_KEYWORDS.some(
+      kw => text.includes(kw) || lowerHref.includes(kw)
     );
-    if (!hasKeyword) return;
+    if (!hasFestivalSignal) return;
+
     try {
       const abs = new URL(href, base).href;
       if (!seen.has(abs)) { seen.add(abs); links.push(abs); }
     } catch { /* ignore */ }
   });
 
-  return links.slice(0, 30);
+  return links.slice(0, 60);
 }
 
-function looksLikeListingPage(html) {
-  const $ = cheerio.load(html);
-  return $("ul a, ol a").length > 60;
+async function processFestivalPage(url, knownWebsites) {
+  const { html, error } = await fetchPage(url);
+  if (!html) { console.log(`  ✗ fetch failed: ${url} — ${error}`); return false; }
+
+  const festival = extractFestivalFromPage(html, url);
+  return stageRecord(festival, knownWebsites);
 }
 
-async function loadKnownUrls() {
-  const set = new Set();
-  const [festivalsRes, stagingRes] = await Promise.all([
-    db.from("festivals").select("application_url, website"),
-    db.from("festival_staging").select("source_url, application_url"),
-  ]);
-  for (const f of festivalsRes.data ?? []) {
-    if (f.application_url) set.add(f.application_url);
-    if (f.website)         set.add(f.website);
+// ── Staging ───────────────────────────────────────────────────────────────────
+
+async function stageRecord(festival, knownWebsites) {
+  const website = festival.official_website || festival.website || null;
+
+  // Skip if we already have this festival
+  if (website && knownWebsites.has(normaliseUrl(website))) {
+    return false;
   }
-  for (const s of stagingRes.data ?? []) {
-    if (s.source_url)      set.add(s.source_url);
-    if (s.application_url) set.add(s.application_url);
+
+  // Validate: must be a real festival
+  const { valid, reason } = validateFestival(festival);
+  if (!valid) {
+    console.log(`  ✗ rejected: "${festival.festival_name}" — ${reason}`);
+    return false;
+  }
+
+  // Geocode if missing coordinates
+  let lat = festival.latitude ?? null;
+  let lng = festival.longitude ?? null;
+
+  if ((lat == null || lng == null) && (festival.city || festival.country)) {
+    const coords = await geocode(festival.city, festival.country);
+    if (coords) { lat = coords.lat; lng = coords.lng; }
+  }
+
+  const { error: insertError } = await db.from("festival_staging").insert({
+    festival_name:       festival.festival_name,
+    country:             festival.country       ?? null,
+    city:                festival.city          ?? null,
+    genre:               festival.genre         ?? null,
+    website:             website,
+    latitude:            lat,
+    longitude:           lng,
+    festival_start_date: festival.festival_start_date ?? null,
+    festival_end_date:   festival.festival_end_date   ?? null,
+    source_url:          festival.source_url,
+    status:              "pending",
+  });
+
+  if (insertError) {
+    console.log(`  ✗ insert failed: "${festival.festival_name}" — ${insertError.message}`);
+    return false;
+  }
+
+  if (website) knownWebsites.add(normaliseUrl(website));
+
+  const geoStr = [festival.city, festival.country].filter(Boolean).join(", ") || "no geo";
+  const coordStr = lat != null ? ` [${lat.toFixed(3)}, ${lng.toFixed(3)}]` : "";
+  console.log(`  + staged: "${festival.festival_name}" | ${geoStr}${coordStr}`);
+  return true;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+async function loadKnownWebsites() {
+  const set = new Set();
+  const [fRes, sRes] = await Promise.all([
+    db.from("festivals").select("website"),
+    db.from("festival_staging").select("website"),
+  ]);
+  for (const r of [...(fRes.data ?? []), ...(sRes.data ?? [])]) {
+    if (r.website) set.add(normaliseUrl(r.website));
   }
   return set;
 }
 
-function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms));
+function normaliseUrl(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+  } catch { return url.toLowerCase(); }
 }
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }

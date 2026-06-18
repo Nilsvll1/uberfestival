@@ -98,7 +98,7 @@ export default async function FestivalPage({
 
   const deadline  = formatDeadline(festival.submission_deadline, lang);
   const color     = festival.category ? genreColor(festival.category) : null;
-  const image     = getFestivalImage(festival.category, festival.id);
+  const image     = getFestivalImage(festival.category, festival.id, festival.hero_image_url);
   const mood      = getMood(image, lang);
   const atmText   = getAtmosphericText(festival.category, festival.city, festival.country, lang);
 

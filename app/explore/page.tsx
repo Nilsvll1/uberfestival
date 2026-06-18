@@ -17,7 +17,7 @@ export default async function Home() {
     supabase
       .from("festivals")
       .select(
-        "id, festival_name, city, country, category, application_url, submission_deadline, latitude, longitude"
+        "id, festival_name, city, country, category, application_url, submission_deadline, latitude, longitude, website, hero_image_url, description"
       ),
     supabase.auth.getUser(),
   ]);

@@ -37,7 +37,7 @@ const FestivalCard = memo(function FestivalCard({
   const t        = getTranslations(lang);
   const deadline = formatDeadline(festival.submission_deadline, lang);
   const color    = festival.category ? genreColor(festival.category) : null;
-  const image    = getFestivalImage(festival.category, festival.id);
+  const image    = getFestivalImage(festival.category, festival.id, festival.hero_image_url);
   const isUrgent = deadline?.status === "urgent";
   const isSoon   = deadline?.status === "soon";
   const score    = getOpportunityScore(festival);
@@ -203,14 +203,14 @@ const FestivalCard = memo(function FestivalCard({
             <span />
           )}
 
-          {festival.application_url && (
+          {(festival.application_url || festival.website) && (
             <a
-              href={festival.application_url}
+              href={festival.application_url ?? festival.website ?? ""}
               target="_blank"
               rel="noopener noreferrer"
               className="btn-cta shrink-0 text-[11.5px] font-semibold px-2.5 py-1.5 rounded-[7px] inline-flex items-center gap-1"
             >
-              {t.card.apply}
+              {festival.application_url ? t.card.apply : t.card.visitWebsite}
               <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden="true">
                 <path d="M2 8L8 2M4 2h4v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>

@@ -213,10 +213,27 @@ const DEFAULT_POOL: GenrePool = {
   overlayStrength: 0.55,
 };
 
+// Explicit aliases for categories that fall through to DEFAULT without them
+const GENRE_ALIASES: Record<string, string> = {
+  "Various":     "Multi-Genre",
+  "Cross-Genre": "Multi-Genre",
+  "EDM":         "Electronic",
+  "House":       "Electronic",
+  "Blues":       "Jazz",
+  "Soul":        "R&B",
+  "Opera":       "Classical",
+  "Punk":        "Rock",
+  "Bluegrass":   "Folk",
+  "Americana":   "Folk",
+  "Jam Band":    "Folk",
+  "Celtic":      "Folk",
+};
+
 function resolvePool(genre: string | null | undefined): GenrePool {
   if (!genre) return DEFAULT_POOL;
-  if (GENRE_POOLS[genre]) return GENRE_POOLS[genre];
-  const lower = genre.toLowerCase();
+  const canonical = GENRE_ALIASES[genre] ?? genre;
+  if (GENRE_POOLS[canonical]) return GENRE_POOLS[canonical];
+  const lower = canonical.toLowerCase();
   for (const [key, pool] of Object.entries(GENRE_POOLS)) {
     if (lower.includes(key.toLowerCase()) || key.toLowerCase().includes(lower)) {
       return pool;
@@ -227,12 +244,13 @@ function resolvePool(genre: string | null | undefined): GenrePool {
 
 export function getFestivalImage(
   genre: string | null | undefined,
-  id?: number
+  id?: number,
+  heroImageUrl?: string | null,
 ): FestivalImageConfig {
   const pool = resolvePool(genre);
   const idx = id !== undefined ? id % pool.urls.length : 0;
   return {
-    url: pool.urls[idx],
+    url: heroImageUrl ?? pool.urls[idx],
     gradient: pool.gradient,
     mood: pool.mood,
     moodEn: pool.moodEn,
