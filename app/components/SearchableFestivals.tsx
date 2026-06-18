@@ -15,6 +15,7 @@ import VirtualFestivalList, {
   type VirtualItem,
 } from "./VirtualFestivalList";
 import { useI18n } from "../hooks/useI18n";
+import type { MapBounds } from "./FestivalMap";
 
 const listVariants = {
   hidden: {},
@@ -71,6 +72,7 @@ export default function SearchableFestivals({
   const [sort,        setSort]        = useState<SortKey>("deadline");
   const [urgencyTab,  setUrgencyTab]  = useState<UrgencyTab>("all");
   const [hoveredId,   setHoveredId]   = useState<number | null>(null);
+  const [mapBounds,   setMapBounds]   = useState<MapBounds | null>(null);
 
   const searchRef      = useRef<HTMLInputElement>(null);
   const mobileSearch   = useRef<HTMLInputElement>(null);
@@ -122,11 +124,38 @@ export default function SearchableFestivals({
     return URGENCY_ORDER.filter(g => map.has(g)).map(g => ({ key: g, items: map.get(g)! }));
   }, [filtered, urgencyTab, sort, today]);
 
-  // Flat items array for the desktop virtual list, mirroring the grouped/flat structure.
+  // Filter sidebar to festivals currently visible in the map viewport.
+  // The map itself always shows all `filtered` festivals (for clustering).
+  // Antimeridian wrap: when east < west the view crosses the 180° meridian.
+  const viewportFiltered = useMemo(() => {
+    if (!mapBounds) return filtered;
+    const { north, south, east, west } = mapBounds;
+    return filtered.filter(f => {
+      if (!f.latitude || !f.longitude) return false;
+      if (f.latitude < south || f.latitude > north) return false;
+      return east >= west
+        ? f.longitude >= west && f.longitude <= east
+        : f.longitude >= west || f.longitude <= east;
+    });
+  }, [filtered, mapBounds]);
+
+  // Groups for viewport-filtered festivals (mirrors `groups` logic but on viewportFiltered).
+  const viewportGroups = useMemo(() => {
+    if (urgencyTab !== "all" || sort !== "deadline") return null;
+    const map = new Map<UrgencyGroup, Festival[]>();
+    for (const f of viewportFiltered) {
+      const g = getUrgencyGroup(f.submission_deadline, today);
+      if (!map.has(g)) map.set(g, []);
+      map.get(g)!.push(f);
+    }
+    return URGENCY_ORDER.filter(g => map.has(g)).map(g => ({ key: g, items: map.get(g)! }));
+  }, [viewportFiltered, urgencyTab, sort, today]);
+
+  // Flat items array for the desktop virtual list (uses viewport-filtered data).
   const virtualItems = useMemo<VirtualItem[]>(() => {
-    if (groups) {
+    if (viewportGroups) {
       const items: VirtualItem[] = [];
-      for (const group of groups) {
+      for (const group of viewportGroups) {
         items.push({
           type: "header",
           label: h.urgencyGroups[
@@ -145,8 +174,8 @@ export default function SearchableFestivals({
       }
       return items;
     }
-    return filtered.map((festival, i) => ({ type: "card", festival, listIndex: i }));
-  }, [groups, filtered, h.urgencyGroups]);
+    return viewportFiltered.map((festival, i) => ({ type: "card", festival, listIndex: i }));
+  }, [viewportGroups, viewportFiltered, h.urgencyGroups]);
 
 
   const hasFilters = query.trim() !== "" || country !== "" || category !== "" || urgencyTab !== "all";
@@ -200,6 +229,7 @@ export default function SearchableFestivals({
             scrollWheelZoom
             hoveredId={hoveredId}
             onHoverChange={setHoveredId}
+            onBoundsChange={setMapBounds}
           />
         </div>
 
@@ -308,12 +338,17 @@ export default function SearchableFestivals({
               </StatPill>
             </div>
 
-            {/* Filter result count */}
-            {(hasFilters || hasSomeHover) && (
+            {/* Filter result count / in-view count */}
+            {(hasFilters || hasSomeHover || (mapBounds && viewportFiltered.length < filtered.length)) && (
               <p className="mt-3 flex items-center gap-2" style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
                 <span>
-                  <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{filtered.length}</span>
-                  {" "}{h.opportunities(filtered.length)}
+                  <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                    {viewportFiltered.length < filtered.length ? viewportFiltered.length : filtered.length}
+                  </span>
+                  {" "}
+                  {viewportFiltered.length < filtered.length
+                    ? t.festival.inView
+                    : h.opportunities(filtered.length)}
                 </span>
                 {hasFilters && (
                   <>
@@ -442,6 +477,16 @@ export default function SearchableFestivals({
             {filtered.length === 0 ? (
               <div className="h-full overflow-y-auto px-4 py-3">
                 <EmptyState hasFilters={hasFilters} onReset={reset} t={t.home} />
+              </div>
+            ) : viewportFiltered.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center gap-3 px-8 text-center">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-muted)", opacity: 0.5 }}>
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+                <p style={{ fontSize: "13px", color: "var(--text-muted)", lineHeight: 1.5 }}>
+                  {t.festival.zoomOut}
+                </p>
               </div>
             ) : (
               <VirtualFestivalList

@@ -50,6 +50,7 @@ export const fr: Translations = {
   },
   card: {
     apply: "Postuler",
+    visitWebsite: "Visiter le site",
     save: "Sauvegarder",
   },
   festival: {
@@ -60,11 +61,14 @@ export const fr: Translations = {
     genre: "Genre",
     deadline: "Deadline",
     apply: "Postuler à ce festival",
-    noApply: "Aucun lien de candidature disponible",
+    visitWebsite: "Visiter le site",
+    noApply: "Aucun lien disponible",
     similar: "Plus d'opportunités",
     discover: "Continuer l'exploration",
     viewAll: "Voir tous →",
     noLocation: "Localisation non disponible",
+    inView: "en vue",
+    zoomOut: "Déplacez ou dézoomez pour trouver des festivals",
   },
   deadline: {
     passed: "Deadline passée",

@@ -217,14 +217,14 @@ export default async function FestivalPage({
 
           {/* Deadline + CTA */}
           <div className="flex items-center gap-4 mt-6 flex-wrap">
-            {festival.application_url && (
+            {(festival.application_url || festival.website) && (
               <a
-                href={festival.application_url}
+                href={festival.application_url ?? festival.website ?? ""}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hero-apply-btn"
               >
-                {t.festival.apply}
+                {festival.application_url ? t.festival.apply : t.festival.visitWebsite}
                 <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
                   <path d="M2.5 9.5l7-7M4 2.5h5.5V8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
@@ -342,15 +342,15 @@ export default async function FestivalPage({
 
             {/* CTA */}
             <div className="mt-auto pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-              {festival.application_url ? (
+              {(festival.application_url || festival.website) ? (
                 <a
-                  href={festival.application_url}
+                  href={festival.application_url ?? festival.website ?? ""}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-cta flex items-center justify-center gap-2 w-full font-semibold py-3 rounded-[11px]"
                   style={{ fontSize: "14px" }}
                 >
-                  {t.festival.apply}
+                  {festival.application_url ? t.festival.apply : t.festival.visitWebsite}
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                     <path d="M2.5 9.5l7-7M4 2.5h5.5V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>

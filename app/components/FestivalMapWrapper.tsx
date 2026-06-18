@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import type { Festival } from "../../lib/types";
+import type { MapBounds } from "./FestivalMap";
 
 const FestivalMap = dynamic(() => import("./FestivalMap"), {
   ssr: false,
@@ -45,6 +46,7 @@ export default function FestivalMapWrapper({
   scrollWheelZoom,
   hoveredId,
   onHoverChange,
+  onBoundsChange,
 }: {
   festivals: Festival[];
   className?: string;
@@ -53,6 +55,7 @@ export default function FestivalMapWrapper({
   scrollWheelZoom?: boolean;
   hoveredId?: number | null;
   onHoverChange?: (id: number | null) => void;
+  onBoundsChange?: (bounds: MapBounds) => void;
 }) {
   return (
     <div className={`w-full overflow-hidden ${className}`}>
@@ -63,6 +66,7 @@ export default function FestivalMapWrapper({
         scrollWheelZoom={scrollWheelZoom}
         hoveredId={hoveredId}
         onHoverChange={onHoverChange}
+        onBoundsChange={onBoundsChange}
       />
     </div>
   );

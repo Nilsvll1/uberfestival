@@ -43,6 +43,7 @@ export type Translations = {
   };
   card: {
     apply: string;
+    visitWebsite: string;
     save: string;
   };
   festival: {
@@ -53,11 +54,14 @@ export type Translations = {
     genre: string;
     deadline: string;
     apply: string;
+    visitWebsite: string;
     noApply: string;
     similar: string;
     discover: string;
     viewAll: string;
     noLocation: string;
+    inView: string;
+    zoomOut: string;
   };
   deadline: {
     passed: string;

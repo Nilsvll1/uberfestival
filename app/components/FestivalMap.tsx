@@ -106,19 +106,40 @@ const MemoMarker = memo(function MemoMarker({
   );
 });
 
-function MapController({ festivals, hoveredId }: { festivals: Festival[]; hoveredId: number | null }) {
+export type MapBounds = { north: number; south: number; east: number; west: number };
+
+function MapController({
+  festivals,
+  hoveredId,
+  onBoundsChange,
+}: {
+  festivals: Festival[];
+  hoveredId: number | null;
+  onBoundsChange?: (bounds: MapBounds) => void;
+}) {
   const map = useMap();
 
   useEffect(() => {
     if (hoveredId === null) return;
     const festival = festivals.find((f) => f.id === hoveredId);
     if (!festival?.latitude || !festival?.longitude) return;
-
     const latlng = L.latLng(festival.latitude, festival.longitude);
     if (!map.getBounds().contains(latlng)) {
       map.panTo(latlng, { animate: true, duration: 0.5, easeLinearity: 0.5 });
     }
   }, [hoveredId, festivals, map]);
+
+  useEffect(() => {
+    if (!onBoundsChange) return;
+    const emit = () => {
+      const b = map.getBounds();
+      onBoundsChange({ north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest() });
+    };
+    emit();
+    map.on("moveend", emit);
+    map.on("zoomend", emit);
+    return () => { map.off("moveend", emit); map.off("zoomend", emit); };
+  }, [map, onBoundsChange]);
 
   return null;
 }
@@ -130,6 +151,7 @@ export default function FestivalMap({
   scrollWheelZoom = true,
   hoveredId = null,
   onHoverChange,
+  onBoundsChange,
 }: {
   festivals: Festival[];
   center?: [number, number];
@@ -137,6 +159,7 @@ export default function FestivalMap({
   scrollWheelZoom?: boolean;
   hoveredId?: number | null;
   onHoverChange?: (id: number | null) => void;
+  onBoundsChange?: (bounds: MapBounds) => void;
 }) {
   // Defer marker rendering until MarkerClusterGroup is mounted on the map.
   // React fires child useEffects before parent useEffects, so without this
@@ -172,7 +195,7 @@ export default function FestivalMap({
         url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
       />
 
-      <MapController festivals={validFestivals} hoveredId={hoveredId} />
+      <MapController festivals={validFestivals} hoveredId={hoveredId} onBoundsChange={onBoundsChange} />
 
       <MarkerClusterGroup
         iconCreateFunction={createClusterIcon}
