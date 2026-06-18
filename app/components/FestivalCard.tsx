@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import type { Festival } from "../../lib/types";
@@ -16,7 +17,7 @@ const SHADOW_BASE =
 const SHADOW_HOVER =
   "0 16px 48px -8px rgba(0,0,0,0.16), 0 6px 20px -4px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.05)";
 
-export default function FestivalCard({
+const FestivalCard = memo(function FestivalCard({
   festival,
   index = 0,
   lang = "en",
@@ -219,4 +220,6 @@ export default function FestivalCard({
       </div>
     </motion.div>
   );
-}
+});
+
+export default FestivalCard;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
@@ -60,6 +60,52 @@ function createClusterIcon(cluster: { getChildCount: () => number }) {
   });
 }
 
+// Memoized per-festival marker. Re-renders only when isActive changes for
+// this specific festival — not on every hoveredId change in the parent.
+const MemoMarker = memo(function MemoMarker({
+  festival,
+  isActive,
+  onHoverChange,
+}: {
+  festival: Festival;
+  isActive: boolean;
+  onHoverChange: (id: number | null) => void;
+}) {
+  const router = useRouter();
+  const color  = festival.category ? genreColor(festival.category) : null;
+  const accent = color?.text ?? "#6366F1";
+
+  const icon = useMemo(
+    () => createMarkerIcon(accent, isActive),
+    [accent, isActive]
+  );
+
+  const handlers = useMemo(() => ({
+    click:     () => router.push(`/festival/${festival.id}`),
+    mouseover: () => onHoverChange(festival.id),
+    mouseout:  () => onHoverChange(null),
+  // router is stable; festival.id and onHoverChange don't change per render
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [festival.id, onHoverChange]);
+
+  return (
+    <Marker
+      position={[festival.latitude!, festival.longitude!]}
+      icon={icon}
+      eventHandlers={handlers}
+    >
+      <Tooltip direction="top" offset={[0, -10]} opacity={1} className="festival-tooltip">
+        <span className="festival-tooltip-name">{festival.festival_name}</span>
+        {(festival.city || festival.country) && (
+          <span className="festival-tooltip-location">
+            {[festival.city, festival.country].filter(Boolean).join(", ")}
+          </span>
+        )}
+      </Tooltip>
+    </Marker>
+  );
+});
+
 function MapController({ festivals, hoveredId }: { festivals: Festival[]; hoveredId: number | null }) {
   const map = useMap();
 
@@ -92,17 +138,25 @@ export default function FestivalMap({
   hoveredId?: number | null;
   onHoverChange?: (id: number | null) => void;
 }) {
-  const router = useRouter();
-
   // Defer marker rendering until MarkerClusterGroup is mounted on the map.
-  // Without this, all 1,106 marker useEffects fire before the cluster's own
-  // useEffect, so this._map is null and every addLayer call is synchronous —
-  // blocking the main thread for several seconds.
+  // React fires child useEffects before parent useEffects, so without this
+  // all 1,000+ marker effects would run while this._map is null, making every
+  // addLayer synchronous and blocking the main thread.
   const [clusterReady, setClusterReady] = useState(false);
   useEffect(() => {
     const id = setTimeout(() => setClusterReady(true), 0);
     return () => clearTimeout(id);
   }, []);
+
+  const handleHoverChange = useCallback(
+    (id: number | null) => onHoverChange?.(id),
+    [onHoverChange]
+  );
+
+  const validFestivals = useMemo(
+    () => festivals.filter((f) => f.latitude && f.longitude),
+    [festivals]
+  );
 
   return (
     <MapContainer
@@ -118,7 +172,7 @@ export default function FestivalMap({
         url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
       />
 
-      <MapController festivals={festivals} hoveredId={hoveredId} />
+      <MapController festivals={validFestivals} hoveredId={hoveredId} />
 
       <MarkerClusterGroup
         iconCreateFunction={createClusterIcon}
@@ -127,41 +181,14 @@ export default function FestivalMap({
         animate
         chunkedLoading
       >
-        {clusterReady && festivals.map((festival) => {
-          if (!festival.latitude || !festival.longitude) return null;
-
-          const color    = festival.category ? genreColor(festival.category) : null;
-          const accent   = color?.text ?? "#6366F1";
-          const isActive = hoveredId === festival.id;
-          const icon     = createMarkerIcon(accent, isActive);
-
-          return (
-            <Marker
-              key={festival.id}
-              position={[festival.latitude, festival.longitude]}
-              icon={icon}
-              eventHandlers={{
-                click:     () => router.push(`/festival/${festival.id}`),
-                mouseover: () => onHoverChange?.(festival.id),
-                mouseout:  () => onHoverChange?.(null),
-              }}
-            >
-              <Tooltip
-                direction="top"
-                offset={[0, -10]}
-                opacity={1}
-                className="festival-tooltip"
-              >
-                <span className="festival-tooltip-name">{festival.festival_name}</span>
-                {(festival.city || festival.country) && (
-                  <span className="festival-tooltip-location">
-                    {[festival.city, festival.country].filter(Boolean).join(", ")}
-                  </span>
-                )}
-              </Tooltip>
-            </Marker>
-          );
-        })}
+        {clusterReady && validFestivals.map((festival) => (
+          <MemoMarker
+            key={festival.id}
+            festival={festival}
+            isActive={hoveredId === festival.id}
+            onHoverChange={handleHoverChange}
+          />
+        ))}
       </MarkerClusterGroup>
     </MapContainer>
   );
