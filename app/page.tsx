@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ContainerScroll } from "@/components/ui/container-scroll-animation";
 import { TestimonialsSection } from "@/components/ui/testimonials-section";
+import { PricingSection } from "@/app/components/PricingSection";
 
 export const metadata: Metadata = {
   title: "UberFestival — Festival opportunities for music professionals",
@@ -160,6 +161,9 @@ export default function LandingPage() {
           />
         </ContainerScroll>
       </section>
+
+      {/* ── Pricing ──────────────────────────────────────────────── */}
+      <PricingSection />
 
       {/* ── Stats bar ────────────────────────────────────────────── */}
       <section
