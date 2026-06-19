@@ -5,6 +5,11 @@ export type Festival = {
   country: string;
   category: string;
   application_url: string;
+  application_platform?: string;
+  application_status?: string;
+  application_source?: string;
+  application_verified_at?: string;
+  application_confidence?: number;
   submission_deadline: string;
   latitude: number;
   longitude: number;
