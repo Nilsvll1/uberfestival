@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, useInView, AnimatePresence } from "motion/react";
 
 const FEATURES = [
@@ -105,6 +106,8 @@ export function PricingSection() {
   const sectionRef = useRef<HTMLElement>(null);
   const isInView = useInView(sectionRef, { once: true, amount: 0.1 });
   const [currentIdx, setCurrentIdx] = useState(0);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const id = setInterval(
@@ -113,6 +116,26 @@ export function PricingSection() {
     );
     return () => clearInterval(id);
   }, []);
+
+  const handleCheckout = useCallback(async () => {
+    setCheckoutLoading(true);
+    try {
+      const res = await fetch("/api/stripe/checkout", { method: "POST" });
+      const data = await res.json();
+
+      if (res.status === 401 || data.error === "not_authenticated") {
+        router.push("/login?redirectTo=/#pricing");
+        return;
+      }
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch {
+      // network error — silently reset
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }, [router]);
 
   return (
     <section
@@ -244,10 +267,10 @@ export function PricingSection() {
 
                 {/* CTAs */}
                 <div className="mt-auto flex flex-col gap-3">
-                  {/* TODO: wire up Stripe checkout — replace onClick with stripe.redirectToCheckout() or router.push('/api/checkout') */}
                   <button
-                    onClick={() => {}}
-                    className="w-full flex items-center justify-center gap-2 rounded-full font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
+                    onClick={handleCheckout}
+                    disabled={checkoutLoading}
+                    className="w-full flex items-center justify-center gap-2 rounded-full font-semibold transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                     style={{
                       fontSize: "14.5px",
                       padding: "13px 24px",
@@ -255,13 +278,24 @@ export function PricingSection() {
                       color: "#fff",
                       boxShadow: "0 4px 20px rgba(99,102,241,0.45)",
                       border: "none",
-                      cursor: "pointer",
+                      cursor: checkoutLoading ? "not-allowed" : "pointer",
                     }}
                   >
-                    Get Premium Access
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                      <path d="M2.5 9.5l7-7M4 2.5h5.5V8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    {checkoutLoading ? (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="animate-spin" aria-hidden="true">
+                          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                        </svg>
+                        Redirecting…
+                      </>
+                    ) : (
+                      <>
+                        Get Premium Access
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                          <path d="M2.5 9.5l7-7M4 2.5h5.5V8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </>
+                    )}
                   </button>
 
                   <Link

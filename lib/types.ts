@@ -63,6 +63,11 @@ export type Profile = {
   website_url: string | null;
   created_at: string;
   updated_at: string;
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
+  subscription_status?: string | null;
+  is_premium?: boolean;
+  premium_until?: string | null;
 };
 
 export type SavedFestival = {
