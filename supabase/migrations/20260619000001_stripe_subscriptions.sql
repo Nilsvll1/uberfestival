@@ -83,19 +83,22 @@ ALTER TABLE saved_festivals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE festival_views  ENABLE ROW LEVEL SECURITY;
 
 -- profiles: users can read and write their own row
-CREATE POLICY IF NOT EXISTS "profiles: own row"
+DROP POLICY IF EXISTS "profiles: own row" ON profiles;
+CREATE POLICY "profiles: own row"
   ON profiles FOR ALL
   USING (auth.uid() = id)
   WITH CHECK (auth.uid() = id);
 
 -- saved_festivals: users manage their own rows
-CREATE POLICY IF NOT EXISTS "saved_festivals: own rows"
+DROP POLICY IF EXISTS "saved_festivals: own rows" ON saved_festivals;
+CREATE POLICY "saved_festivals: own rows"
   ON saved_festivals FOR ALL
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
 -- festival_views: users manage their own rows
-CREATE POLICY IF NOT EXISTS "festival_views: own rows"
+DROP POLICY IF EXISTS "festival_views: own rows" ON festival_views;
+CREATE POLICY "festival_views: own rows"
   ON festival_views FOR ALL
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
