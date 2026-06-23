@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "../../../lib/supabase-server";
 
@@ -67,6 +67,7 @@ export async function approveStaging(id: number, overrides: Record<string, strin
 
   await db.from("festival_staging").update({ status: "approved" }).eq("id", id);
 
+  revalidateTag("festivals", "max");
   revalidatePath("/dashboard/admin");
 }
 
@@ -81,6 +82,7 @@ export async function updateFestival(id: number, fields: Record<string, string>)
   await requireAdmin();
   const db = serviceClient();
   await db.from("festivals").update({ ...fields, scrape_status: "ok" }).eq("id", id);
+  revalidateTag("festivals", "max");
   revalidatePath("/dashboard/admin");
 }
 
@@ -166,6 +168,7 @@ export async function unarchiveFestival(id: number) {
     archived_at: null,
     scrape_status: "ok",
   }).eq("id", id);
+  revalidateTag("festivals", "max");
   revalidatePath("/dashboard/admin");
 }
 
@@ -198,6 +201,7 @@ export async function addFestivalManually(fields: {
   });
 
   if (error) throw new Error(error.message);
+  revalidateTag("festivals", "max");
   revalidatePath("/dashboard/admin");
 }
 

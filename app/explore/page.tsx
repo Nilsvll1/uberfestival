@@ -1,8 +1,26 @@
 import { Suspense } from "react";
+import { unstable_cache } from "next/cache";
 import { cookies } from "next/headers";
 import { createClient } from "../../lib/supabase-server";
+import { supabaseAdmin } from "../../lib/supabase-admin";
 import { DEFAULT_LANGUAGE, LANG_COOKIE, isValidLanguage, getTranslations } from "../../lib/i18n";
 import SearchableFestivals from "../components/SearchableFestivals";
+
+// Festival list is the same for every visitor — cache it for 1 hour.
+// Invalidated immediately when admin approves/rejects via revalidateTag('festivals').
+const getFestivals = unstable_cache(
+  async () => {
+    const { data, error } = await supabaseAdmin
+      .from("festivals")
+      .select(
+        "id, festival_name, city, country, category, application_url, submission_deadline, latitude, longitude, website, hero_image_url, description"
+      )
+      .neq("is_archived", true);
+    return { data, error };
+  },
+  ["festivals-list"],
+  { tags: ["festivals"], revalidate: 3600 }
+);
 
 export default async function Home() {
   const cookieStore = await cookies();
@@ -12,15 +30,9 @@ export default async function Home() {
 
   const supabase = await createClient();
 
-  // Fetch festivals and user in parallel.
+  // Festival data (cached) and user session (per-request) run in parallel.
   const [festivalsResult, { data: { user } }] = await Promise.all([
-    supabase
-      .from("festivals")
-      .select(
-        "id, festival_name, city, country, category, application_url, submission_deadline, latitude, longitude, website, hero_image_url, description"
-      )
-      // Exclude archived opportunities — soft-deleted by the weekly pipeline
-      .neq("is_archived", true),
+    getFestivals(),
     supabase.auth.getUser(),
   ]);
 
