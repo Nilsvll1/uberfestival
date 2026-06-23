@@ -131,6 +131,31 @@ export async function deleteRssFeed(id: number) {
   revalidatePath("/dashboard/admin");
 }
 
+// ─── Curated festival pages ───────────────────────────────────────────────────
+
+export async function addFestivalPage(name: string, url: string, category?: string) {
+  await requireAdmin();
+  if (!url.match(/^https?:\/\//i)) throw new Error("URL must start with https://");
+  const db = serviceClient();
+  const { error } = await db.from("festival_pages").insert({ name, url, category: category || null });
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/admin");
+}
+
+export async function toggleFestivalPage(id: number, isActive: boolean) {
+  await requireAdmin();
+  const db = serviceClient();
+  await db.from("festival_pages").update({ is_active: isActive }).eq("id", id);
+  revalidatePath("/dashboard/admin");
+}
+
+export async function deleteFestivalPage(id: number) {
+  await requireAdmin();
+  const db = serviceClient();
+  await db.from("festival_pages").delete().eq("id", id);
+  revalidatePath("/dashboard/admin");
+}
+
 // ─── Unarchive a festival ─────────────────────────────────────────────────────
 
 export async function unarchiveFestival(id: number) {

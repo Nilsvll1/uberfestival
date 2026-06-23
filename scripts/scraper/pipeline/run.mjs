@@ -4,10 +4,10 @@
  * Four-phase execution:
  *
  *   Phase A — Discovery
- *     1. Start a pipeline_runs record
- *     2. Load all active rss_feeds
- *     3. For each feed: fetch → parse → extract candidates
- *     4. Deduplicate against the existing festival index
+ *     A1. Start a pipeline_runs record
+ *     A2. RSS feeds: fetch → parse → extract candidates
+ *     A3. Page monitor: fetch curated festival pages, diff hash, extract on change
+ *     Deduplicate all candidates against the existing festival index
  *     Result: two arrays — newCandidates, updateCandidates (all in-memory)
  *
  *   Phase B — Enrichment
@@ -30,6 +30,7 @@
  *   node --env-file=.env pipeline/run.mjs --dry-run
  *   node --env-file=.env pipeline/run.mjs --feed-id=3
  *   node --env-file=.env pipeline/run.mjs --skip-archive
+ *   node --env-file=.env pipeline/run.mjs --skip-pages
  *
  * Required env:
  *   SUPABASE_URL
@@ -44,12 +45,14 @@ import { enrichBatch, rescoreAfterEnrichment } from "./enricher.mjs";
 import { createFestival, updateFestival } from "./updater.mjs";
 import { archiveStale }           from "./archiver.mjs";
 import { createReporter }         from "./reporter.mjs";
+import { monitorFestivalPages }   from "./page-monitor.mjs";
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
 const args         = process.argv.slice(2);
 const DRY_RUN      = args.includes("--dry-run");
 const FEED_ID      = parseInt(args.find((a) => a.startsWith("--feed-id="))?.split("=")[1] ?? "0", 10);
 const SKIP_ARCHIVE = args.includes("--skip-archive");
+const SKIP_PAGES   = args.includes("--skip-pages");
 
 // Politeness: wait between feed fetches so we don't hammer source servers
 const FEED_DELAY_MS = 1_500;
@@ -167,6 +170,21 @@ try {
     }
 
     await sleep(FEED_DELAY_MS);
+  }
+
+  // ── Source A3: Curated festival page monitor ──────────────────────────────
+  if (!SKIP_PAGES) {
+    console.log(`\n── Phase A3: Curated page monitor`);
+    const pageCandidates = await monitorFestivalPages(db, reporter, runId, DRY_RUN);
+
+    for (const { record, baseConfidence } of pageCandidates) {
+      const { match } = index.findMatch(record);
+      if (match) {
+        updateCandidates.push({ existingId: match.id, existing: match, record });
+      } else {
+        newCandidates.push({ record, baseConfidence });
+      }
+    }
   }
 
   console.log(`\n  Discovery complete: ${newCandidates.length} new, ${updateCandidates.length} updates`);

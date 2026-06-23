@@ -11,6 +11,9 @@ import {
   addRssFeed,
   toggleRssFeed,
   deleteRssFeed,
+  addFestivalPage,
+  toggleFestivalPage,
+  deleteFestivalPage,
 } from "./actions";
 import type { StagedFestival, ScrapeSource, RssFeed, PipelineRun } from "../../../lib/types";
 
@@ -29,7 +32,7 @@ export default async function AdminPage() {
   const db = supabaseAdmin;
 
   // ── Data fetching ──────────────────────────────────────────────────────────
-  const [stagingRes, needsAttentionRes, sourcesRes, statsRes, rssFeedsRes, pipelineRunsRes] = await Promise.all([
+  const [stagingRes, needsAttentionRes, sourcesRes, statsRes, rssFeedsRes, pipelineRunsRes, festivalPagesRes] = await Promise.all([
     db.from("festival_staging").select("*").eq("status", "pending").order("created_at", { ascending: false }).limit(50),
     db.from("festivals").select("id, festival_name, city, country, scrape_status, scrape_error, application_url, last_scraped_at")
       .in("scrape_status", ["dead_link", "failed", "manual_review"])
@@ -44,6 +47,7 @@ export default async function AdminPage() {
     ]),
     db.from("rss_feeds").select("*").order("created_at"),
     db.from("pipeline_runs").select("*").order("started_at", { ascending: false }).limit(10),
+    db.from("festival_pages").select("*").order("name"),
   ]);
 
   const staged: StagedFestival[] = (stagingRes.data ?? []) as StagedFestival[];
@@ -51,6 +55,11 @@ export default async function AdminPage() {
   const sources = sourcesRes.data ?? [];
   const rssFeeds: RssFeed[] = (rssFeedsRes.data ?? []) as RssFeed[];
   const pipelineRuns: PipelineRun[] = (pipelineRunsRes.data ?? []) as PipelineRun[];
+  const festivalPages = (festivalPagesRes.data ?? []) as Array<{
+    id: number; name: string; url: string; category: string | null;
+    last_hash: string | null; last_checked_at: string | null;
+    last_open_at: string | null; is_active: boolean;
+  }>;
   const [totalFestivals, pendingStaging, deadLinks, archivedCount] = statsRes;
 
   return (
@@ -246,6 +255,77 @@ export default async function AdminPage() {
             <input name="name" placeholder="Feed name" required className="input flex-1" style={{ minWidth: 160 }} />
             <input name="url" type="url" placeholder="https://example.com/feed.rss" required className="input flex-1" style={{ minWidth: 280 }} />
             <button type="submit" className="btn-primary">Add feed</button>
+          </form>
+        </Section>
+
+        {/* ── Curated festival pages ── */}
+        <Section title={`Curated festival pages (${festivalPages.length})`}
+          subtitle="Official call-for-entry pages the weekly pipeline monitors for content changes. Only re-extracts when the page hash changes.">
+          <div className="flex flex-col gap-2 mb-4">
+            {festivalPages.map((p) => (
+              <div key={p.id} className="flex items-center gap-3 rounded-xl border px-4 py-2.5"
+                style={{ background: p.is_active ? "#fff" : "#fafafa", borderColor: "var(--border)", opacity: p.is_active ? 1 : 0.55 }}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium" style={{ fontSize: "13px", color: "var(--text-primary)" }}>{p.name}</span>
+                    {p.category && (
+                      <span className="rounded-full px-2 py-0.5" style={{ fontSize: "10px", background: "var(--accent)18", color: "var(--accent)", fontWeight: 600 }}>
+                        {p.category}
+                      </span>
+                    )}
+                    {p.last_open_at && (
+                      <span className="rounded-full px-2 py-0.5" style={{ fontSize: "10px", background: "#05966918", color: "#059669", fontWeight: 600 }}>
+                        open
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-3 flex-wrap mt-0.5" style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                    <a href={p.url} target="_blank" rel="noopener noreferrer" className="hover:underline truncate max-w-xs">{p.url}</a>
+                    {p.last_checked_at && <span>Checked {new Date(p.last_checked_at).toLocaleDateString()}</span>}
+                    {p.last_open_at && <span>Open {new Date(p.last_open_at).toLocaleDateString()}</span>}
+                  </div>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <form action={async () => { "use server"; await toggleFestivalPage(p.id, !p.is_active); }}>
+                    <button type="submit" className="text-xs px-2.5 py-1 rounded-lg border"
+                      style={{ borderColor: "var(--border)", color: "var(--text-muted)", background: "transparent" }}>
+                      {p.is_active ? "Pause" : "Enable"}
+                    </button>
+                  </form>
+                  <form action={async () => { "use server"; await deleteFestivalPage(p.id); }}>
+                    <button type="submit" className="text-xs px-2.5 py-1 rounded-lg border"
+                      style={{ borderColor: "#FCA5A5", color: "#DC2626", background: "transparent" }}>
+                      Remove
+                    </button>
+                  </form>
+                </div>
+              </div>
+            ))}
+          </div>
+          <form action={async (data: FormData) => {
+            "use server";
+            const name     = data.get("name") as string;
+            const url      = data.get("url") as string;
+            const category = data.get("category") as string;
+            if (name && url) await addFestivalPage(name, url, category || undefined);
+          }} className="flex gap-2 flex-wrap">
+            <input name="name" placeholder="Page name" required
+              className="flex-1 min-w-[160px] rounded-xl border px-3 py-2 text-sm"
+              style={{ borderColor: "var(--border)", background: "#fff" }} />
+            <input name="url" placeholder="https://..." required type="url"
+              className="flex-[2] min-w-[220px] rounded-xl border px-3 py-2 text-sm"
+              style={{ borderColor: "var(--border)", background: "#fff" }} />
+            <select name="category"
+              className="rounded-xl border px-3 py-2 text-sm"
+              style={{ borderColor: "var(--border)", background: "#fff", color: "var(--text-primary)" }}>
+              <option value="">category…</option>
+              <option value="film">Film</option>
+              <option value="music">Music</option>
+              <option value="documentary">Documentary</option>
+              <option value="screenwriting">Screenwriting</option>
+              <option value="residency">Residency</option>
+            </select>
+            <button type="submit" className="btn-primary">Add page</button>
           </form>
         </Section>
 
