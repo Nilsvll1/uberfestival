@@ -60,6 +60,9 @@ export async function syncLocalSaves(
   festivalIds: number[]
 ): Promise<{ error?: string }> {
   if (!festivalIds.length) return {};
+  if (festivalIds.length > 500) return { error: "Too many IDs" };
+  if (!festivalIds.every((id) => Number.isInteger(id) && id > 0 && id < 2_147_483_647))
+    return { error: "Invalid festival IDs" };
   const supabase = await createClient();
   const {
     data: { user },
@@ -80,9 +83,12 @@ export async function syncLocalSaves(
   return {};
 }
 
+// Fields users are allowed to update on their own profile.
+type UserEditableProfile = Pick<Profile, "artist_name" | "country" | "primary_genre" | "instagram_url" | "spotify_url" | "website_url">;
+
 /* ── Update profile ──────────────────────────────────────────── */
 export async function updateProfile(
-  data: Partial<Omit<Profile, "id" | "created_at" | "updated_at">>
+  data: Partial<UserEditableProfile>
 ): Promise<{ error?: string }> {
   const supabase = await createClient();
   const {
@@ -90,9 +96,20 @@ export async function updateProfile(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
 
+  // Allowlist: only permit user-owned profile fields.
+  // Never let callers touch is_premium, stripe_*, subscription_status, premium_until.
+  const { artist_name, country, primary_genre, instagram_url, spotify_url, website_url } = data;
+  const safeData: Partial<UserEditableProfile> = {};
+  if (artist_name !== undefined)   safeData.artist_name   = artist_name;
+  if (country     !== undefined)   safeData.country       = country;
+  if (primary_genre !== undefined) safeData.primary_genre = primary_genre;
+  if (instagram_url !== undefined) safeData.instagram_url = instagram_url;
+  if (spotify_url !== undefined)   safeData.spotify_url   = spotify_url;
+  if (website_url !== undefined)   safeData.website_url   = website_url;
+
   const { error } = await supabase
     .from("profiles")
-    .update({ ...data, updated_at: new Date().toISOString() })
+    .update({ ...safeData, updated_at: new Date().toISOString() })
     .eq("id", user.id);
 
   if (error) return { error: error.message };

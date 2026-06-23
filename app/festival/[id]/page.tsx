@@ -77,7 +77,7 @@ export default async function FestivalPage({
     ).then(() => {});
   }
 
-  const [relatedResult, savedResult] = await Promise.all([
+  const [relatedResult, savedResult, profileResult] = await Promise.all([
     supabase
       .from("festivals")
       .select("id, festival_name, city, country, category, application_url, submission_deadline, latitude, longitude")
@@ -91,10 +91,14 @@ export default async function FestivalPage({
           .eq("user_id", user.id)
           .in("festival_id", [festival.id])
       : Promise.resolve({ data: [] }),
+    user
+      ? supabase.from("profiles").select("is_premium").eq("id", user.id).single()
+      : Promise.resolve({ data: null }),
   ]);
 
   const { data: related } = relatedResult;
   const savedIds = (savedResult.data ?? []).map((s: { festival_id: number }) => s.festival_id);
+  const isPremium: boolean | null = user ? (profileResult.data?.is_premium ?? false) : null;
 
   const deadline  = formatDeadline(festival.submission_deadline, lang);
   const color     = festival.category ? genreColor(festival.category) : null;
@@ -217,7 +221,18 @@ export default async function FestivalPage({
 
           {/* Deadline + CTA */}
           <div className="flex items-center gap-4 mt-6 flex-wrap">
-            {(festival.application_url || festival.website) && (
+            {festival.application_url && isPremium === false ? (
+              <a
+                href="/#pricing"
+                className="hero-apply-btn"
+                style={{ background: "rgba(99,102,241,0.85)", backdropFilter: "blur(8px)" }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12 1l2.5 5 5.5.8-4 3.9.9 5.5L12 14l-4.9 2.6.9-5.5L4 7.8 9.5 7z"/>
+                </svg>
+                Get Premium to Apply
+              </a>
+            ) : (festival.application_url || festival.website) ? (
               <a
                 href={festival.application_url ?? festival.website ?? ""}
                 target="_blank"
@@ -229,7 +244,7 @@ export default async function FestivalPage({
                   <path d="M2.5 9.5l7-7M4 2.5h5.5V8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </a>
-            )}
+            ) : null}
             {deadline && (
               <span
                 className="text-[12.5px] font-medium"
@@ -342,7 +357,24 @@ export default async function FestivalPage({
 
             {/* CTA */}
             <div className="mt-auto pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-              {(festival.application_url || festival.website) ? (
+              {festival.application_url && isPremium === false ? (
+                <a
+                  href="/#pricing"
+                  className="flex items-center justify-center gap-2 w-full font-semibold py-3 rounded-[11px] transition-opacity hover:opacity-90"
+                  style={{
+                    fontSize: "14px",
+                    background: "linear-gradient(135deg, #6366F1 0%, #5254E8 100%)",
+                    color: "#fff",
+                    textDecoration: "none",
+                    boxShadow: "0 4px 16px rgba(99,102,241,0.35)",
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12 1l2.5 5 5.5.8-4 3.9.9 5.5L12 14l-4.9 2.6.9-5.5L4 7.8 9.5 7z"/>
+                  </svg>
+                  Get Premium to Apply
+                </a>
+              ) : (festival.application_url || festival.website) ? (
                 <a
                   href={festival.application_url ?? festival.website ?? ""}
                   target="_blank"
@@ -432,6 +464,7 @@ export default async function FestivalPage({
                     lang={lang}
                     userId={user?.id ?? null}
                     initialSaved={savedIds.includes(f.id)}
+                    isPremium={isPremium}
                   />
                 </li>
               ))}

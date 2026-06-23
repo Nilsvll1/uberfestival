@@ -53,11 +53,13 @@ export default function SearchableFestivals({
   userId = null,
   savedIds = [],
   today,
+  isPremium = null,
 }: {
   festivals: Festival[];
   userId?: string | null;
   today: string;
   savedIds?: number[];
+  isPremium?: boolean | null;
 }) {
   const { lang, t } = useI18n();
   const h = t.home;
@@ -266,8 +268,8 @@ export default function SearchableFestivals({
             width: 420,
             zIndex: 450,
             background: "rgba(249,249,251,0.92)",
-            backdropFilter: "blur(32px) saturate(200%)",
-            WebkitBackdropFilter: "blur(32px) saturate(200%)",
+            backdropFilter: "blur(16px) saturate(150%)",
+            WebkitBackdropFilter: "blur(16px) saturate(150%)",
             borderRight: "1px solid rgba(0,0,0,0.07)",
             boxShadow: "12px 0 48px rgba(0,0,0,0.07)",
           }}
@@ -540,6 +542,7 @@ export default function SearchableFestivals({
                   userId={userId}
                   savedIds={savedIds}
                   lang={lang}
+                  isPremium={isPremium}
                   onHoverChange={setHoveredId}
                 />
               )}
@@ -707,6 +710,7 @@ export default function SearchableFestivals({
                     lang={lang}
                     userId={userId}
                     initialSaved={savedIds.includes(festival.id)}
+                    isPremium={isPremium}
                   />
                 </motion.li>
               ))}

@@ -106,6 +106,44 @@ export async function toggleSource(id: number, isActive: boolean) {
   revalidatePath("/dashboard/admin");
 }
 
+// ─── RSS feed actions ─────────────────────────────────────────────────────────
+
+export async function addRssFeed(name: string, url: string) {
+  await requireAdmin();
+  if (!url.match(/^https?:\/\//i)) throw new Error("URL must start with https://");
+  const db = serviceClient();
+  const { error } = await db.from("rss_feeds").insert({ name, url });
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/admin");
+}
+
+export async function toggleRssFeed(id: number, isActive: boolean) {
+  await requireAdmin();
+  const db = serviceClient();
+  await db.from("rss_feeds").update({ is_active: isActive }).eq("id", id);
+  revalidatePath("/dashboard/admin");
+}
+
+export async function deleteRssFeed(id: number) {
+  await requireAdmin();
+  const db = serviceClient();
+  await db.from("rss_feeds").delete().eq("id", id);
+  revalidatePath("/dashboard/admin");
+}
+
+// ─── Unarchive a festival ─────────────────────────────────────────────────────
+
+export async function unarchiveFestival(id: number) {
+  await requireAdmin();
+  const db = serviceClient();
+  await db.from("festivals").update({
+    is_archived: false,
+    archived_at: null,
+    scrape_status: "ok",
+  }).eq("id", id);
+  revalidatePath("/dashboard/admin");
+}
+
 export async function addFestivalManually(fields: {
   festival_name: string;
   country?: string;

@@ -293,6 +293,7 @@ export default async function DashboardPage() {
                 lang={lang}
                 userId={user.id}
                 initialSaved={savedIds.includes(festival.id)}
+                isPremium={profile?.is_premium ?? false}
               />
             ))}
           </div>
@@ -320,6 +321,7 @@ export default async function DashboardPage() {
                 lang={lang}
                 userId={user.id}
                 initialSaved={savedIds.includes(festival.id)}
+                isPremium={profile?.is_premium ?? false}
               />
             ))}
           </div>

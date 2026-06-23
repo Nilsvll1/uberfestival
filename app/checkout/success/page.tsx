@@ -1,12 +1,56 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { stripe } from "../../../lib/stripe";
+import { createClient } from "../../../lib/supabase-server";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Welcome to Premium | UberFestival",
 };
 
-export default function CheckoutSuccessPage() {
+// Always re-fetch on each visit — webhooks may have updated the DB.
+export const dynamic = "force-dynamic";
+
+export default async function CheckoutSuccessPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ session_id?: string }>;
+}) {
+  const { session_id } = await searchParams;
+
+  // Verify the checkout session exists and is paid via Stripe.
+  // This is the authoritative source — DB may lag behind the webhook.
+  let sessionValid = false;
+  if (session_id) {
+    try {
+      const session = await stripe.checkout.sessions.retrieve(session_id);
+      sessionValid = session.payment_status === "paid" || session.status === "complete";
+    } catch {
+      // Invalid session_id — fall through to generic success view.
+    }
+  }
+
+  // Also check DB premium status (may already be set if webhook fired quickly).
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  let dbPremium = false;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_premium")
+      .eq("id", user.id)
+      .single();
+    dbPremium = profile?.is_premium ?? false;
+  }
+
+  // If there's no session_id and no DB premium status, redirect to pricing.
+  if (!session_id && !dbPremium) {
+    redirect("/#pricing");
+  }
+
+  const confirmed = sessionValid || dbPremium;
+
   return (
     <main
       className="min-h-screen flex flex-col items-center justify-center px-6 text-white"
@@ -77,8 +121,9 @@ export default function CheckoutSuccessPage() {
           className="leading-relaxed mb-10"
           style={{ fontSize: "15px", color: "rgba(255,255,255,0.42)" }}
         >
-          Your subscription is active. You now have access to 1,100+ verified
-          festivals, application links, and deadline tracking — worldwide.
+          {confirmed
+            ? "Your subscription is active. You now have access to 1,100+ verified festivals, application links, and deadline tracking — worldwide."
+            : "Payment received. Your Premium access is being activated — it'll be ready in a moment."}
         </p>
 
         {/* What you unlocked */}
@@ -102,8 +147,8 @@ export default function CheckoutSuccessPage() {
           </p>
           <div className="flex flex-col gap-3">
             {[
+              "Festival application links — apply directly",
               "Access to 1,100+ festivals worldwide",
-              "Festival application links",
               "Submission deadline tracking",
               "Unlimited favorites",
               "Worldwide festival map",

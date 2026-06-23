@@ -2,6 +2,25 @@ import { NextResponse } from "next/server";
 import { createClient } from "../../../../lib/supabase-server";
 import { stripe } from "../../../../lib/stripe";
 
+// Simple in-process rate limiter (per-user, per cold-start).
+// On Vercel this resets on each function cold start, providing a best-effort
+// guard against accidental multi-click spam (not a substitute for Redis-backed
+// rate limiting at scale, but effective for early launch traffic volumes).
+const checkoutAttempts = new Map<string, { count: number; resetAt: number }>();
+const RATE_WINDOW_MS = 60_000; // 1 minute
+const RATE_LIMIT     = 5;      // max 5 checkout initiations per user per minute
+
+function isRateLimited(userId: string): boolean {
+  const now = Date.now();
+  const entry = checkoutAttempts.get(userId);
+  if (!entry || entry.resetAt < now) {
+    checkoutAttempts.set(userId, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return false;
+  }
+  entry.count++;
+  return entry.count > RATE_LIMIT;
+}
+
 export async function POST() {
   const supabase = await createClient();
   const {
@@ -10,6 +29,13 @@ export async function POST() {
 
   if (!user) {
     return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
+  }
+
+  if (isRateLimited(user.id)) {
+    return NextResponse.json(
+      { error: "rate_limited", retryAfter: 60 },
+      { status: 429, headers: { "Retry-After": "60" } }
+    );
   }
 
   const { data: profile } = await supabase

@@ -65,14 +65,45 @@ body {
   border-color: var(--border);
 }
 
-/* ─── Map marker pulse ──────────────────────────────────────── */
-@keyframes markerPulse {
-  0%   { box-shadow: 0 0 0 0 rgba(99,102,241,0.4), 0 2px 8px rgba(0,0,0,0.22); }
-  60%  { box-shadow: 0 0 0 7px rgba(99,102,241,0),  0 2px 8px rgba(0,0,0,0.22); }
-  100% { box-shadow: 0 0 0 0 rgba(99,102,241,0),    0 2px 8px rgba(0,0,0,0.22); }
+/* ─── Map markers ───────────────────────────────────────────── */
+/* Active state is toggled via classList on the Leaflet element —
+   no React re-render or Leaflet setIcon() call on hover. */
+.ubf-marker-dot {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2.5px solid #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.22), 0 0 0 0.5px rgba(0,0,0,0.08);
+  cursor: pointer;
+  transition: transform 200ms cubic-bezier(0.22,1,0.36,1);
+  will-change: transform;
 }
-.marker-pulse {
-  animation: markerPulse 1.6s ease-out infinite;
+
+/* GPU-accelerated scale — no layout, no box-shadow recompute on Safari. */
+.ubf-marker-active .ubf-marker-dot {
+  transform: scale(1.375);
+}
+
+/* Expanding ring uses transform:scale only — GPU-composited in Safari. */
+.ubf-marker-dot::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  background: rgba(99,102,241,0.22);
+  transform: scale(0);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ubf-marker-active .ubf-marker-dot::after {
+  animation: ubf-pulse-ring 1.5s ease-out infinite;
+}
+
+@keyframes ubf-pulse-ring {
+  0%   { transform: scale(0.5); opacity: 0.7; }
+  100% { transform: scale(2.0); opacity: 0; }
 }
 
 /* ─── Stagger fade-up ───────────────────────────────────────── */

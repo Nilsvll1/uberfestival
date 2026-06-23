@@ -1,0 +1,97 @@
+name: Weekly Festival Pipeline
+
+on:
+  # Every Monday at 07:00 UTC (offset from scraper at 06:00 to avoid conflicts)
+  schedule:
+    - cron: "0 7 * * 1"
+
+  # Manual trigger — allows targeting a single feed or dry-run mode
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode"
+        required: false
+        default: "full"
+        type: choice
+        options:
+          - full          # fetch all RSS feeds + archive
+          - dry-run       # parse only, no DB writes
+          - archive-only  # skip RSS, only archive stale festivals
+      feed_id:
+        description: "Process a single feed (leave blank for all)"
+        required: false
+        default: ""
+
+jobs:
+  pipeline:
+    name: RSS Ingestion Pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Node.js setup ─────────────────────────────────────────────────────
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: scripts/scraper/package-lock.json
+
+      # ── Install dependencies ──────────────────────────────────────────────
+      - name: Install scraper dependencies
+        working-directory: scripts/scraper
+        run: npm ci
+
+      # ── Dry-run mode ──────────────────────────────────────────────────────
+      - name: Run pipeline (dry-run)
+        if: ${{ github.event.inputs.mode == 'dry-run' }}
+        working-directory: scripts/scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node pipeline/run.mjs --dry-run
+
+      # ── Archive-only mode ─────────────────────────────────────────────────
+      - name: Run pipeline (archive-only)
+        if: ${{ github.event.inputs.mode == 'archive-only' }}
+        working-directory: scripts/scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node pipeline/run.mjs --skip-feeds --skip-archive=false
+
+      # ── Single-feed mode ──────────────────────────────────────────────────
+      - name: Run pipeline (single feed)
+        if: ${{ github.event.inputs.mode == 'full' && github.event.inputs.feed_id != '' }}
+        working-directory: scripts/scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node pipeline/run.mjs --feed-id=${{ github.event.inputs.feed_id }} --skip-archive
+
+      # ── Full weekly run (scheduled + full manual) ─────────────────────────
+      - name: Run pipeline (full)
+        if: ${{ github.event_name == 'schedule' || (github.event.inputs.mode == 'full' && github.event.inputs.feed_id == '') }}
+        working-directory: scripts/scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node pipeline/run.mjs
+
+      # ── Post summary to GitHub Actions job summary ────────────────────────
+      - name: Post run summary
+        if: always()
+        run: |
+          echo "## Festival Pipeline Run" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Mode | ${{ github.event.inputs.mode || 'scheduled' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Time | $(date -u '+%Y-%m-%d %H:%M UTC') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Trigger | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the [Admin Dashboard](https://uberfestival.vercel.app/dashboard/admin) for detailed run logs." >> $GITHUB_STEP_SUMMARY

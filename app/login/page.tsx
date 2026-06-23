@@ -21,8 +21,14 @@ export default async function LoginPage({
 
   const { redirectTo } = await searchParams;
 
+  // Reject absolute URLs and protocol-relative paths — open redirect prevention.
+  const safeRedirect =
+    redirectTo?.startsWith("/") && !redirectTo.startsWith("//")
+      ? redirectTo
+      : "/dashboard";
+
   if (user) {
-    redirect(redirectTo ?? "/dashboard");
+    redirect(safeRedirect);
   }
 
   return <AuthPage initialView="sign_in" />;

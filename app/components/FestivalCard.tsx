@@ -25,6 +25,7 @@ const FestivalCard = memo(function FestivalCard({
   isDimmed = false,
   userId = null,
   initialSaved = false,
+  isPremium = null,
 }: {
   festival: Festival;
   index?: number;
@@ -33,6 +34,7 @@ const FestivalCard = memo(function FestivalCard({
   isDimmed?: boolean;
   userId?: string | null;
   initialSaved?: boolean;
+  isPremium?: boolean | null;
 }) {
   const t        = getTranslations(lang);
   const deadline = formatDeadline(festival.submission_deadline, lang);
@@ -203,7 +205,18 @@ const FestivalCard = memo(function FestivalCard({
             <span />
           )}
 
-          {(festival.application_url || festival.website) && (
+          {festival.application_url && isPremium === false ? (
+            <a
+              href="/#pricing"
+              className="shrink-0 text-[11px] font-semibold px-2.5 py-1.5 rounded-[7px] inline-flex items-center gap-1"
+              style={{ background: "rgba(99,102,241,0.08)", color: "#6366F1", border: "1px solid rgba(99,102,241,0.20)" }}
+            >
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 1l2.5 5 5.5.8-4 3.9.9 5.5L12 14l-4.9 2.6.9-5.5L4 7.8 9.5 7z"/>
+              </svg>
+              Premium
+            </a>
+          ) : (festival.application_url || festival.website) ? (
             <a
               href={festival.application_url ?? festival.website ?? ""}
               target="_blank"
@@ -215,7 +228,7 @@ const FestivalCard = memo(function FestivalCard({
                 <path d="M2 8L8 2M4 2h4v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </a>
-          )}
+          ) : null}
         </div>
       </div>
     </motion.div>

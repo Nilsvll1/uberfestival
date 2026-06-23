@@ -83,3 +83,41 @@ export type FestivalView = {
   festival_id: number;
   viewed_at: string;
 };
+
+export type RssFeed = {
+  id: number;
+  name: string;
+  url: string;
+  feed_type: "rss" | "atom";
+  is_active: boolean;
+  last_fetched_at: string | null;
+  last_fetch_status: "ok" | "failed" | "empty" | "parse_error" | null;
+  items_last_run: number;
+  created_at: string;
+};
+
+export type PipelineRun = {
+  id: number;
+  started_at: string;
+  completed_at: string | null;
+  status: "running" | "completed" | "failed";
+  feeds_processed: number;
+  items_found: number;
+  festivals_created: number;
+  festivals_updated: number;
+  festivals_archived: number;
+  errors_count: number;
+  duration_ms: number | null;
+  error_message: string | null;
+  summary: Record<string, unknown> | null;
+};
+
+export type PipelineRunEvent = {
+  id: number;
+  run_id: number;
+  created_at: string;
+  level: "info" | "warn" | "error";
+  event_type: string;
+  message: string;
+  data: Record<string, unknown> | null;
+};

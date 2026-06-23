@@ -18,7 +18,9 @@ export default async function Home() {
       .from("festivals")
       .select(
         "id, festival_name, city, country, category, application_url, submission_deadline, latitude, longitude, website, hero_image_url, description"
-      ),
+      )
+      // Exclude archived opportunities — soft-deleted by the weekly pipeline
+      .neq("is_archived", true),
     supabase.auth.getUser(),
   ]);
 
@@ -44,14 +46,16 @@ export default async function Home() {
     );
   }
 
-  // Fetch saved festival IDs for the logged-in user.
+  // Fetch saved festival IDs and premium status for the logged-in user.
   let savedIds: number[] = [];
+  let isPremium: boolean | null = null;
   if (user) {
-    const { data: saved } = await supabase
-      .from("saved_festivals")
-      .select("festival_id")
-      .eq("user_id", user.id);
-    savedIds = saved?.map((s: { festival_id: number }) => s.festival_id) ?? [];
+    const [savedResult, profileResult] = await Promise.all([
+      supabase.from("saved_festivals").select("festival_id").eq("user_id", user.id),
+      supabase.from("profiles").select("is_premium").eq("id", user.id).single(),
+    ]);
+    savedIds = savedResult.data?.map((s: { festival_id: number }) => s.festival_id) ?? [];
+    isPremium = profileResult.data?.is_premium ?? false;
   }
 
   const today = new Date().toISOString().slice(0, 10);
@@ -64,6 +68,7 @@ export default async function Home() {
           userId={user?.id ?? null}
           savedIds={savedIds}
           today={today}
+          isPremium={isPremium}
         />
       </Suspense>
     </main>

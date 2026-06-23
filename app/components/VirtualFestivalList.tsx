@@ -112,6 +112,7 @@ type RowDataProps = {
   userId: string | null;
   savedIds: number[];
   lang: Language;
+  isPremium: boolean | null;
   onHoverChange: (id: number | null) => void;
 };
 
@@ -136,6 +137,7 @@ function Row({
   userId,
   savedIds,
   lang,
+  isPremium,
   onHoverChange,
 }: RowProps) {
   const item = items[index];
@@ -178,6 +180,7 @@ function Row({
         isDimmed={hasSomeHover && hoveredId !== festival.id}
         userId={userId}
         initialSaved={savedIds.includes(festival.id)}
+        isPremium={isPremium}
       />
     </div>
   );
@@ -200,10 +203,11 @@ const VirtualFestivalList = forwardRef<
     userId: string | null;
     savedIds: number[];
     lang: Language;
+    isPremium: boolean | null;
     onHoverChange: (id: number | null) => void;
   }
 >(function VirtualFestivalList(
-  { items, hoveredId, hasSomeHover, userId, savedIds, lang, onHoverChange },
+  { items, hoveredId, hasSomeHover, userId, savedIds, lang, isPremium, onHoverChange },
   ref,
 ) {
   const listRef = useListRef(null);
@@ -249,8 +253,8 @@ const VirtualFestivalList = forwardRef<
   // rowProps is recreated when hoveredId changes; react-window only passes it
   // to visible rows (~3–9 at a time), keeping re-render scope minimal.
   const rowProps = useMemo<RowDataProps>(
-    () => ({ items: itemsWithSpacer, hoveredId, hasSomeHover, userId, savedIds, lang, onHoverChange }),
-    [itemsWithSpacer, hoveredId, hasSomeHover, userId, savedIds, lang, onHoverChange],
+    () => ({ items: itemsWithSpacer, hoveredId, hasSomeHover, userId, savedIds, lang, isPremium, onHoverChange }),
+    [itemsWithSpacer, hoveredId, hasSomeHover, userId, savedIds, lang, isPremium, onHoverChange],
   );
 
   return (

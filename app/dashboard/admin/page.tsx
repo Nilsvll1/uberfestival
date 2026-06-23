@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "../../../lib/supabase-server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "../../../lib/supabase-admin";
 import {
   approveStaging,
   rejectStaging,
@@ -8,19 +8,13 @@ import {
   addScrapeSource,
   addFestivalManually,
   toggleSource,
+  addRssFeed,
+  toggleRssFeed,
+  deleteRssFeed,
 } from "./actions";
-import type { StagedFestival, ScrapeSource } from "../../../lib/types";
+import type { StagedFestival, ScrapeSource, RssFeed, PipelineRun } from "../../../lib/types";
 
 export const metadata = { title: "Admin | UberFestival" };
-
-// Service client for reads (admin page only — key kept server-side).
-function serviceDb() {
-  return createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
-}
 
 export default async function AdminPage() {
   // ── Auth + admin guard ─────────────────────────────────────────────────────
@@ -31,10 +25,11 @@ export default async function AdminPage() {
   const adminEmails = (process.env.ADMIN_EMAIL ?? "").split(",").map((e) => e.trim());
   if (!adminEmails.includes(user.email ?? "")) redirect("/dashboard");
 
-  const db = serviceDb();
+  // Use the shared service-role client (no new instance per request)
+  const db = supabaseAdmin;
 
   // ── Data fetching ──────────────────────────────────────────────────────────
-  const [stagingRes, needsAttentionRes, sourcesRes, statsRes] = await Promise.all([
+  const [stagingRes, needsAttentionRes, sourcesRes, statsRes, rssFeedsRes, pipelineRunsRes] = await Promise.all([
     db.from("festival_staging").select("*").eq("status", "pending").order("created_at", { ascending: false }).limit(50),
     db.from("festivals").select("id, festival_name, city, country, scrape_status, scrape_error, application_url, last_scraped_at")
       .in("scrape_status", ["dead_link", "failed", "manual_review"])
@@ -42,16 +37,21 @@ export default async function AdminPage() {
       .limit(50),
     db.from("scrape_sources").select("*").order("created_at"),
     Promise.all([
-      db.from("festivals").select("id", { count: "exact", head: true }),
+      db.from("festivals").select("id", { count: "exact", head: true }).neq("is_archived", true),
       db.from("festival_staging").select("id", { count: "exact", head: true }).eq("status", "pending"),
       db.from("festivals").select("id", { count: "exact", head: true }).eq("scrape_status", "dead_link"),
+      db.from("festivals").select("id", { count: "exact", head: true }).eq("is_archived", true),
     ]),
+    db.from("rss_feeds").select("*").order("created_at"),
+    db.from("pipeline_runs").select("*").order("started_at", { ascending: false }).limit(10),
   ]);
 
   const staged: StagedFestival[] = (stagingRes.data ?? []) as StagedFestival[];
   const needsAttention = needsAttentionRes.data ?? [];
   const sources = sourcesRes.data ?? [];
-  const [totalFestivals, pendingStaging, deadLinks] = statsRes;
+  const rssFeeds: RssFeed[] = (rssFeedsRes.data ?? []) as RssFeed[];
+  const pipelineRuns: PipelineRun[] = (pipelineRunsRes.data ?? []) as PipelineRun[];
+  const [totalFestivals, pendingStaging, deadLinks, archivedCount] = statsRes;
 
   return (
     <main style={{ background: "var(--bg)", minHeight: "100vh" }}>
@@ -70,7 +70,8 @@ export default async function AdminPage() {
             </h1>
           </div>
           <div className="flex gap-3 flex-wrap">
-            <StatChip label="Total festivals" value={String(totalFestivals.count ?? 0)} />
+            <StatChip label="Live festivals" value={String(totalFestivals.count ?? 0)} />
+            <StatChip label="Archived" value={String(archivedCount.count ?? 0)} />
             <StatChip label="Pending review" value={String(pendingStaging.count ?? 0)} accent />
             <StatChip label="Dead links" value={String(deadLinks.count ?? 0)} warn />
           </div>
@@ -206,12 +207,125 @@ export default async function AdminPage() {
           </form>
         </Section>
 
+        {/* ── RSS feeds ── */}
+        <Section title="RSS feeds"
+          subtitle="Feeds the weekly pipeline ingests for new festival opportunities.">
+          <div className="flex flex-col gap-2 mb-4">
+            {rssFeeds.map((f) => (
+              <div key={f.id} className="flex items-center gap-3 rounded-xl px-4 py-3 border"
+                style={{ background: "#fff", borderColor: "var(--border)" }}>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate" style={{ fontSize: "13.5px", color: "var(--text-primary)" }}>{f.name}</p>
+                  <p className="truncate" style={{ fontSize: "12px", color: "var(--text-muted)" }}>{f.url}</p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  {f.last_fetched_at && (
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                      {f.items_last_run} items · {new Date(f.last_fetched_at).toLocaleDateString()}
+                    </span>
+                  )}
+                  <FeedStatusBadge status={f.last_fetch_status} />
+                  <form action={toggleRssFeed.bind(null, f.id, !f.is_active)}>
+                    <button type="submit" className="btn-sm" style={{ color: f.is_active ? "#059669" : "var(--text-muted)" }}>
+                      {f.is_active ? "Active" : "Paused"}
+                    </button>
+                  </form>
+                  <form action={deleteRssFeed.bind(null, f.id)}>
+                    <button type="submit" className="btn-sm" style={{ color: "#DC2626" }}>Remove</button>
+                  </form>
+                </div>
+              </div>
+            ))}
+          </div>
+          <form action={async (data: FormData) => {
+            "use server";
+            const name = data.get("name") as string;
+            const url  = data.get("url")  as string;
+            if (name && url) await addRssFeed(name, url);
+          }} className="flex gap-2 flex-wrap">
+            <input name="name" placeholder="Feed name" required className="input flex-1" style={{ minWidth: 160 }} />
+            <input name="url" type="url" placeholder="https://example.com/feed.rss" required className="input flex-1" style={{ minWidth: 280 }} />
+            <button type="submit" className="btn-primary">Add feed</button>
+          </form>
+        </Section>
+
+        {/* ── Pipeline run history ── */}
+        <Section title="Pipeline run history"
+          subtitle="Last 10 weekly ingestion runs. Each Monday, the pipeline fetches all RSS feeds and updates the festival database.">
+          {pipelineRuns.length === 0 ? (
+            <Empty>No pipeline runs yet — the first run will happen next Monday at 07:00 UTC.</Empty>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border" style={{ borderColor: "var(--border)" }}>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ borderBottom: "1px solid var(--border)", background: "rgba(0,0,0,0.02)" }}>
+                    {["#", "Started", "Status", "Feeds", "Found", "Created", "Updated", "Archived", "Errors", "Duration"].map((h) => (
+                      <th key={h} className="px-3 py-3 text-left font-semibold"
+                        style={{ fontSize: "10.5px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {pipelineRuns.map((run) => (
+                    <tr key={run.id} style={{ borderBottom: "1px solid var(--border)", background: "#fff" }}>
+                      <td className="px-3 py-2.5 tabular-nums" style={{ fontSize: "12px", color: "var(--text-muted)" }}>#{run.id}</td>
+                      <td className="px-3 py-2.5 tabular-nums" style={{ fontSize: "12px", color: "var(--text-primary)", whiteSpace: "nowrap" }}>
+                        {new Date(run.started_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </td>
+                      <td className="px-3 py-2.5"><RunStatusBadge status={run.status} /></td>
+                      <td className="px-3 py-2.5 tabular-nums text-center" style={{ fontSize: "13px" }}>{run.feeds_processed}</td>
+                      <td className="px-3 py-2.5 tabular-nums text-center" style={{ fontSize: "13px" }}>{run.items_found}</td>
+                      <td className="px-3 py-2.5 tabular-nums text-center" style={{ fontSize: "13px", color: "#059669", fontWeight: run.festivals_created > 0 ? 600 : 400 }}>{run.festivals_created}</td>
+                      <td className="px-3 py-2.5 tabular-nums text-center" style={{ fontSize: "13px" }}>{run.festivals_updated}</td>
+                      <td className="px-3 py-2.5 tabular-nums text-center" style={{ fontSize: "13px", color: "var(--text-muted)" }}>{run.festivals_archived}</td>
+                      <td className="px-3 py-2.5 tabular-nums text-center" style={{ fontSize: "13px", color: run.errors_count > 0 ? "#DC2626" : "var(--text-muted)" }}>{run.errors_count}</td>
+                      <td className="px-3 py-2.5 tabular-nums" style={{ fontSize: "12px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                        {run.duration_ms ? `${(run.duration_ms / 1000).toFixed(0)}s` : run.status === "running" ? "…" : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Section>
+
       </div>
     </main>
   );
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
+
+function FeedStatusBadge({ status }: { status: string | null }) {
+  if (!status) return null;
+  const colors: Record<string, string> = {
+    ok: "#059669", failed: "#DC2626", empty: "#D97706", parse_error: "#DC2626",
+  };
+  return (
+    <span className="rounded-full px-2 py-0.5 font-medium"
+      style={{ fontSize: "10px", background: `${colors[status] ?? "#9CA3AF"}18`, color: colors[status] ?? "#9CA3AF" }}>
+      {status}
+    </span>
+  );
+}
+
+function RunStatusBadge({ status }: { status: string }) {
+  const map: Record<string, [string, string]> = {
+    completed: ["#059669", "completed"],
+    failed:    ["#DC2626", "failed"],
+    running:   ["#D97706", "running…"],
+  };
+  const [color, label] = map[status] ?? ["#9CA3AF", status];
+  return (
+    <span className="rounded-full px-2.5 py-0.5 font-medium"
+      style={{ fontSize: "11px", background: `${color}18`, color }}>
+      {label}
+    </span>
+  );
+}
 
 function StagingCard({ item }: { item: StagedFestival }) {
   return (

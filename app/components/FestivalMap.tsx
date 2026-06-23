@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
@@ -11,26 +11,14 @@ import { genreColor } from "../../lib/utils";
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 
-function createMarkerIcon(accentColor: string, active: boolean) {
-  const size = active ? 22 : 16;
-  const offset = size / 2;
-  const shadow = active
-    ? `0 0 0 5px ${accentColor}28, 0 2px 8px rgba(0,0,0,0.22)`
-    : `0 2px 8px rgba(0,0,0,0.22), 0 0 0 0.5px rgba(0,0,0,0.08)`;
-  const animClass = active ? "marker-pulse" : "";
+// Icon never changes after mount — active state is toggled via CSS class directly
+// on the marker element, bypassing React and Leaflet's setIcon() entirely.
+function createMarkerIcon(accentColor: string) {
   return L.divIcon({
-    html: `<div class="${animClass}" style="
-      width:${size}px;height:${size}px;
-      border-radius:50%;
-      background:${accentColor};
-      border:2.5px solid #fff;
-      box-shadow:${shadow};
-      transition:width 200ms cubic-bezier(0.22,1,0.36,1),height 200ms cubic-bezier(0.22,1,0.36,1),box-shadow 200ms ease;
-      cursor:pointer;
-    "></div>`,
-    className: "",
-    iconSize: [size, size],
-    iconAnchor: [offset, offset],
+    html: `<div class="ubf-marker-dot" style="background:${accentColor}"></div>`,
+    className: "ubf-marker",
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
   });
 }
 
@@ -60,36 +48,41 @@ function createClusterIcon(cluster: { getChildCount: () => number }) {
   });
 }
 
-// Memoized per-festival marker. Re-renders only when isActive changes for
-// this specific festival — not on every hoveredId change in the parent.
+// Fully static after mount: no isActive prop, no useRouter.
+// Re-renders only when festival identity or stable callbacks change (never in practice).
 const MemoMarker = memo(function MemoMarker({
   festival,
-  isActive,
   onHoverChange,
+  onClick,
+  onRegisterRef,
 }: {
   festival: Festival;
-  isActive: boolean;
   onHoverChange: (id: number | null) => void;
+  onClick: (id: number) => void;
+  onRegisterRef: (id: number, marker: L.Marker | null) => void;
 }) {
-  const router = useRouter();
-  const color  = festival.category ? genreColor(festival.category) : null;
+  const color = festival.category ? genreColor(festival.category) : null;
   const accent = color?.text ?? "#6366F1";
 
-  const icon = useMemo(
-    () => createMarkerIcon(accent, isActive),
-    [accent, isActive]
+  const icon = useMemo(() => createMarkerIcon(accent), [accent]);
+
+  const handlers = useMemo(
+    () => ({
+      click: () => onClick(festival.id),
+      mouseover: () => onHoverChange(festival.id),
+      mouseout: () => onHoverChange(null),
+    }),
+    [festival.id, onClick, onHoverChange]
   );
 
-  const handlers = useMemo(() => ({
-    click:     () => router.push(`/festival/${festival.id}`),
-    mouseover: () => onHoverChange(festival.id),
-    mouseout:  () => onHoverChange(null),
-  // router is stable; festival.id and onHoverChange don't change per render
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [festival.id, onHoverChange]);
+  const refCallback = useCallback(
+    (marker: L.Marker | null) => onRegisterRef(festival.id, marker),
+    [festival.id, onRegisterRef]
+  );
 
   return (
     <Marker
+      ref={refCallback}
       position={[festival.latitude!, festival.longitude!]}
       icon={icon}
       eventHandlers={handlers}
@@ -106,7 +99,13 @@ const MemoMarker = memo(function MemoMarker({
   );
 });
 
-export type MapBounds = { north: number; south: number; east: number; west: number; zoom: number };
+export type MapBounds = {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+  zoom: number;
+};
 
 function MapController({
   festivals,
@@ -119,26 +118,41 @@ function MapController({
 }) {
   const map = useMap();
 
+  // O(1) lookup instead of O(n) find on every hover change.
+  const festivalById = useMemo(
+    () => new Map(festivals.map((f) => [f.id, f])),
+    [festivals]
+  );
+
   useEffect(() => {
     if (hoveredId === null) return;
-    const festival = festivals.find((f) => f.id === hoveredId);
+    const festival = festivalById.get(hoveredId);
     if (!festival?.latitude || !festival?.longitude) return;
     const latlng = L.latLng(festival.latitude, festival.longitude);
     if (!map.getBounds().contains(latlng)) {
       map.panTo(latlng, { animate: true, duration: 0.5, easeLinearity: 0.5 });
     }
-  }, [hoveredId, festivals, map]);
+  }, [hoveredId, festivalById, map]);
 
   useEffect(() => {
     if (!onBoundsChange) return;
     const emit = () => {
       const b = map.getBounds();
-      onBoundsChange({ north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest(), zoom: map.getZoom() });
+      onBoundsChange({
+        north: b.getNorth(),
+        south: b.getSouth(),
+        east: b.getEast(),
+        west: b.getWest(),
+        zoom: map.getZoom(),
+      });
     };
     emit();
     map.on("moveend", emit);
     map.on("zoomend", emit);
-    return () => { map.off("moveend", emit); map.off("zoomend", emit); };
+    return () => {
+      map.off("moveend", emit);
+      map.off("zoomend", emit);
+    };
   }, [map, onBoundsChange]);
 
   return null;
@@ -161,19 +175,51 @@ export default function FestivalMap({
   onHoverChange?: (id: number | null) => void;
   onBoundsChange?: (bounds: MapBounds) => void;
 }) {
-  // Defer marker rendering until MarkerClusterGroup is mounted on the map.
-  // React fires child useEffects before parent useEffects, so without this
-  // all 1,000+ marker effects would run while this._map is null, making every
-  // addLayer synchronous and blocking the main thread.
+  // Single router instance for the whole map (not per-marker).
+  const router = useRouter();
+
+  // Direct refs to Leaflet marker instances for zero-React-render hover toggling.
+  const markerRefsMap = useRef(new Map<number, L.Marker>());
+  const prevHoveredRef = useRef<number | null>(null);
+
   const [clusterReady, setClusterReady] = useState(false);
   useEffect(() => {
     const id = setTimeout(() => setClusterReady(true), 0);
     return () => clearTimeout(id);
   }, []);
 
+  // Apply active CSS class directly on the Leaflet marker DOM element.
+  // No React re-renders happen for hover state changes.
+  useEffect(() => {
+    const prev = prevHoveredRef.current;
+    if (prev !== null) {
+      markerRefsMap.current.get(prev)?.getElement()?.classList.remove("ubf-marker-active");
+    }
+    if (hoveredId !== null) {
+      markerRefsMap.current.get(hoveredId)?.getElement()?.classList.add("ubf-marker-active");
+    }
+    prevHoveredRef.current = hoveredId;
+  }, [hoveredId]);
+
   const handleHoverChange = useCallback(
     (id: number | null) => onHoverChange?.(id),
     [onHoverChange]
+  );
+
+  const handleClick = useCallback(
+    (id: number) => router.push(`/festival/${id}`),
+    [router]
+  );
+
+  const registerMarkerRef = useCallback(
+    (id: number, marker: L.Marker | null) => {
+      if (marker) {
+        markerRefsMap.current.set(id, marker);
+      } else {
+        markerRefsMap.current.delete(id);
+      }
+    },
+    []
   );
 
   const validFestivals = useMemo(
@@ -188,14 +234,17 @@ export default function FestivalMap({
       scrollWheelZoom={scrollWheelZoom}
       style={{ height: "100%", width: "100%" }}
       zoomAnimation
-      fadeAnimation
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
       />
 
-      <MapController festivals={validFestivals} hoveredId={hoveredId} onBoundsChange={onBoundsChange} />
+      <MapController
+        festivals={validFestivals}
+        hoveredId={hoveredId}
+        onBoundsChange={onBoundsChange}
+      />
 
       <MarkerClusterGroup
         iconCreateFunction={createClusterIcon}
@@ -203,15 +252,19 @@ export default function FestivalMap({
         showCoverageOnHover={false}
         animate
         chunkedLoading
+        disableClusteringAtZoom={9}
+        animateAddingMarkers={false}
       >
-        {clusterReady && validFestivals.map((festival) => (
-          <MemoMarker
-            key={festival.id}
-            festival={festival}
-            isActive={hoveredId === festival.id}
-            onHoverChange={handleHoverChange}
-          />
-        ))}
+        {clusterReady &&
+          validFestivals.map((festival) => (
+            <MemoMarker
+              key={festival.id}
+              festival={festival}
+              onHoverChange={handleHoverChange}
+              onClick={handleClick}
+              onRegisterRef={registerMarkerRef}
+            />
+          ))}
       </MarkerClusterGroup>
     </MapContainer>
   );
