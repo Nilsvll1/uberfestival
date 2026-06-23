@@ -30,6 +30,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
+  // Idempotency check — Stripe retries webhooks for up to 3 days.
+  // Return 200 immediately if we've already processed this event.
+  const { data: seen } = await supabaseAdmin
+    .from("processed_webhook_events")
+    .select("stripe_event_id")
+    .eq("stripe_event_id", event.id)
+    .maybeSingle();
+
+  if (seen) {
+    return NextResponse.json({ received: true, duplicate: true });
+  }
+
   try {
     switch (event.type) {
       case "checkout.session.completed": {
@@ -139,6 +151,15 @@ export async function POST(req: Request) {
     console.error("[stripe webhook] handler error:", err);
     return NextResponse.json({ error: "handler_error" }, { status: 500 });
   }
+
+  // Mark event as processed. ignoreDuplicates silently no-ops if two racing
+  // deliveries of the same event both reach this point simultaneously.
+  await supabaseAdmin
+    .from("processed_webhook_events")
+    .upsert(
+      { stripe_event_id: event.id, event_type: event.type },
+      { onConflict: "stripe_event_id", ignoreDuplicates: true },
+    );
 
   return NextResponse.json({ received: true });
 }
