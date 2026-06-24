@@ -32,7 +32,7 @@ export default async function AdminPage() {
   const db = supabaseAdmin;
 
   // ── Data fetching ──────────────────────────────────────────────────────────
-  const [stagingRes, needsAttentionRes, sourcesRes, statsRes, rssFeedsRes, pipelineRunsRes, festivalPagesRes] = await Promise.all([
+  const [stagingRes, needsAttentionRes, sourcesRes, statsRes, rssFeedsRes, pipelineRunsRes, festivalPagesRes, linkHealthRes] = await Promise.all([
     db.from("festival_staging").select("*").eq("status", "pending").order("created_at", { ascending: false }).limit(50),
     db.from("festivals").select("id, festival_name, city, country, scrape_status, scrape_error, application_url, last_scraped_at")
       .in("scrape_status", ["dead_link", "failed", "manual_review"])
@@ -48,6 +48,19 @@ export default async function AdminPage() {
     db.from("rss_feeds").select("*").order("created_at"),
     db.from("pipeline_runs").select("*").order("started_at", { ascending: false }).limit(10),
     db.from("festival_pages").select("*").order("name"),
+    Promise.all([
+      db.from("festivals").select("id", { count: "exact", head: true }).not("application_url", "is", null).eq("is_archived", false),
+      db.from("festivals").select("id", { count: "exact", head: true }).eq("link_check_status", "ok").eq("is_archived", false),
+      db.from("festivals").select("id", { count: "exact", head: true })
+        .in("link_check_status", ["not_found", "redirect_unrelated", "parked", "dead_domain", "timeout", "error"])
+        .eq("is_archived", false),
+      db.from("festivals")
+        .select("id, festival_name, city, link_check_status, link_check_at, application_url")
+        .in("link_check_status", ["not_found", "redirect_unrelated", "parked", "dead_domain", "timeout", "error"])
+        .eq("is_archived", false)
+        .order("link_check_at", { ascending: false })
+        .limit(20),
+    ]),
   ]);
 
   const staged: StagedFestival[] = (stagingRes.data ?? []) as StagedFestival[];
@@ -55,6 +68,17 @@ export default async function AdminPage() {
   const sources = sourcesRes.data ?? [];
   const rssFeeds: RssFeed[] = (rssFeedsRes.data ?? []) as RssFeed[];
   const pipelineRuns: PipelineRun[] = (pipelineRunsRes.data ?? []) as PipelineRun[];
+
+  const [totalWithUrlRes, okLinksRes, brokenLinksRes, brokenListRes] = linkHealthRes;
+  const totalWithUrl  = totalWithUrlRes.count ?? 0;
+  const okLinks       = okLinksRes.count ?? 0;
+  const brokenLinks   = brokenLinksRes.count ?? 0;
+  const uncheckedLinks = totalWithUrl - okLinks - brokenLinks;
+  const reliabilityPct = totalWithUrl > 0 ? Math.round((okLinks / totalWithUrl) * 100) : 0;
+  const brokenLinkList = (brokenListRes.data ?? []) as Array<{
+    id: number; festival_name: string; city: string | null;
+    link_check_status: string; link_check_at: string | null; application_url: string;
+  }>;
   const festivalPages = (festivalPagesRes.data ?? []) as Array<{
     id: number; name: string; url: string; category: string | null;
     last_hash: string | null; last_checked_at: string | null;
@@ -150,6 +174,86 @@ export default async function AdminPage() {
                 </tbody>
               </table>
             </div>
+          )}
+        </Section>
+
+        {/* ── Link health ── */}
+        <Section title="Application link health"
+          subtitle="Weekly validation status for every Premium application URL. Pipeline checks ~150 per run; run validate-apply-links.mjs for a full sweep.">
+
+          {/* KPI row */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div className="rounded-[12px] border px-4 py-2.5 text-center" style={{ background: "#fff", borderColor: "var(--border)" }}>
+              <p className="font-extrabold tabular-nums" style={{ fontSize: "20px", color: "var(--text-primary)", letterSpacing: "-0.03em" }}>{totalWithUrl}</p>
+              <p style={{ fontSize: "10.5px", color: "var(--text-muted)" }}>URLs total</p>
+            </div>
+            <div className="rounded-[12px] border px-4 py-2.5 text-center" style={{ background: "#fff", borderColor: "var(--border)" }}>
+              <p className="font-extrabold tabular-nums" style={{ fontSize: "20px", color: "#059669", letterSpacing: "-0.03em" }}>{okLinks}</p>
+              <p style={{ fontSize: "10.5px", color: "var(--text-muted)" }}>Working</p>
+            </div>
+            <div className="rounded-[12px] border px-4 py-2.5 text-center" style={{ background: "#fff", borderColor: "var(--border)" }}>
+              <p className="font-extrabold tabular-nums" style={{ fontSize: "20px", color: brokenLinks > 0 ? "#DC2626" : "var(--text-primary)", letterSpacing: "-0.03em" }}>{brokenLinks}</p>
+              <p style={{ fontSize: "10.5px", color: "var(--text-muted)" }}>Broken</p>
+            </div>
+            <div className="rounded-[12px] border px-4 py-2.5 text-center" style={{ background: "#fff", borderColor: "var(--border)" }}>
+              <p className="font-extrabold tabular-nums" style={{ fontSize: "20px", color: reliabilityPct >= 95 ? "#059669" : reliabilityPct >= 80 ? "#D97706" : "#DC2626", letterSpacing: "-0.03em" }}>
+                {totalWithUrl > 0 ? `${reliabilityPct}%` : "—"}
+              </p>
+              <p style={{ fontSize: "10.5px", color: "var(--text-muted)" }}>Reliability</p>
+            </div>
+          </div>
+
+          {/* Unchecked note */}
+          {uncheckedLinks > 0 && (
+            <p className="mb-4" style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+              {uncheckedLinks} URL{uncheckedLinks !== 1 ? "s" : ""} not yet checked by the validator — they will be prioritised in the next pipeline run.
+            </p>
+          )}
+
+          {/* Broken links table */}
+          {brokenLinkList.length > 0 ? (
+            <div className="overflow-x-auto rounded-2xl border" style={{ borderColor: "var(--border)" }}>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ borderBottom: "1px solid var(--border)", background: "rgba(0,0,0,0.02)" }}>
+                    {["Festival", "Status", "Last checked", ""].map((h) => (
+                      <th key={h} className="px-4 py-3 text-left font-semibold"
+                        style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {brokenLinkList.map((f) => (
+                    <tr key={f.id} style={{ borderBottom: "1px solid var(--border)", background: "#fff" }}>
+                      <td className="px-4 py-3 font-medium" style={{ color: "var(--text-primary)" }}>
+                        {f.festival_name}
+                        {f.city && <span style={{ color: "var(--text-muted)", fontWeight: 400 }}> · {f.city}</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <LinkStatusBadge status={f.link_check_status} />
+                      </td>
+                      <td className="px-4 py-3 tabular-nums" style={{ color: "var(--text-muted)", fontSize: "12px" }}>
+                        {f.link_check_at ? new Date(f.link_check_at).toLocaleDateString() : "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <a href={f.application_url} target="_blank" rel="noopener noreferrer" className="btn-sm">
+                          Check ↗
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : totalWithUrl > 0 ? (
+            <div className="rounded-2xl border py-10 text-center"
+              style={{ borderColor: "var(--border)", borderStyle: "dashed", color: "var(--text-muted)", fontSize: "13.5px" }}>
+              {uncheckedLinks > 0 ? "Awaiting first validation run." : "All application links are working."}
+            </div>
+          ) : (
+            <Empty>No application URLs in the database yet.</Empty>
           )}
         </Section>
 
@@ -472,6 +576,35 @@ function StatChip({ label, value, accent, warn }: { label: string; value: string
       <p className="font-extrabold tabular-nums" style={{ fontSize: "20px", color, letterSpacing: "-0.03em" }}>{value}</p>
       <p style={{ fontSize: "10.5px", color: "var(--text-muted)" }}>{label}</p>
     </div>
+  );
+}
+
+function LinkStatusBadge({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    ok: "#059669",
+    not_found: "#DC2626",
+    redirect_unrelated: "#D97706",
+    parked: "#DC2626",
+    login_wall: "#D97706",
+    expired: "#6366F1",
+    dead_domain: "#DC2626",
+    timeout: "#D97706",
+    error: "#DC2626",
+    unchecked: "#9CA3AF",
+  };
+  const labels: Record<string, string> = {
+    not_found: "404",
+    redirect_unrelated: "bad redirect",
+    dead_domain: "dead domain",
+    login_wall: "login wall",
+  };
+  const color = colors[status] ?? "#9CA3AF";
+  const label = labels[status] ?? status?.replace(/_/g, " ");
+  return (
+    <span className="rounded-full px-2.5 py-0.5 font-medium"
+      style={{ fontSize: "11px", background: `${color}18`, color }}>
+      {label}
+    </span>
   );
 }
 

@@ -33,7 +33,7 @@ export async function GET(
   // Use service role so RLS doesn't interfere with the lookup.
   const { data: festival } = await supabaseAdmin
     .from("festivals")
-    .select("application_url")
+    .select("application_url, application_url_secondary, website, link_check_status")
     .eq("id", id)
     .single();
 
@@ -41,11 +41,22 @@ export async function GET(
     return NextResponse.redirect(`${origin}/festival/${id}`);
   }
 
+  // Cascade: primary → secondary (if primary is known-broken) → website
+  // "unchecked" and "ok" statuses always use the primary URL.
+  const BROKEN = new Set(["not_found", "redirect_unrelated", "parked", "dead_domain", "timeout", "error"]);
+  const primaryBroken = festival.link_check_status && BROKEN.has(festival.link_check_status);
+
+  const rawUrl = primaryBroken && festival.application_url_secondary
+    ? festival.application_url_secondary
+    : primaryBroken && festival.website
+    ? festival.website
+    : festival.application_url;
+
   // Validate the stored URL before issuing the redirect.
   // Prevents open-redirect if a bad value ever reaches the DB.
   let applyUrl: URL;
   try {
-    applyUrl = new URL(festival.application_url);
+    applyUrl = new URL(rawUrl);
   } catch {
     return NextResponse.redirect(`${origin}/festival/${id}`);
   }
@@ -53,5 +64,5 @@ export async function GET(
     return NextResponse.redirect(`${origin}/festival/${id}`);
   }
 
-  return NextResponse.redirect(festival.application_url);
+  return NextResponse.redirect(applyUrl.href);
 }

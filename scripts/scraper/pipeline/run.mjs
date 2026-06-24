@@ -32,6 +32,7 @@
  *   node --env-file=.env pipeline/run.mjs --skip-archive
  *   node --env-file=.env pipeline/run.mjs --skip-pages
  *   node --env-file=.env pipeline/run.mjs --skip-festhome
+ *   node --env-file=.env pipeline/run.mjs --skip-links
  *
  * Required env:
  *   SUPABASE_URL
@@ -48,6 +49,7 @@ import { archiveStale }           from "./archiver.mjs";
 import { createReporter }         from "./reporter.mjs";
 import { monitorFestivalPages }   from "./page-monitor.mjs";
 import { scrapeFesthome }         from "./festhome-scraper.mjs";
+import { validateApplicationLinks } from "./link-validator.mjs";
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
 const args         = process.argv.slice(2);
@@ -56,6 +58,7 @@ const FEED_ID      = parseInt(args.find((a) => a.startsWith("--feed-id="))?.spli
 const SKIP_ARCHIVE = args.includes("--skip-archive");
 const SKIP_PAGES    = args.includes("--skip-pages");
 const SKIP_FESTHOME = args.includes("--skip-festhome");
+const SKIP_LINKS    = args.includes("--skip-links");
 
 // Politeness: wait between feed fetches so we don't hammer source servers
 const FEED_DELAY_MS = 1_500;
@@ -312,6 +315,24 @@ try {
     reporter.log(runId, "info", "archive", `Archived ${archived} stale festival(s)`);
   }
 
+  // ════════════════════════════════════════════════════════════════
+  // PHASE E — APPLICATION LINK VALIDATION
+  // ════════════════════════════════════════════════════════════════
+  if (!SKIP_LINKS) {
+    try {
+      const { checked, broken, recovered } = await validateApplicationLinks(
+        db, reporter, runId, DRY_RUN,
+        { limit: 150, concurrency: 3 },
+      );
+      stats.linksChecked  = checked;
+      stats.linksBroken   = broken;
+      stats.linksRecovered = recovered;
+    } catch (err) {
+      reporter.log(runId, "error", "phase_e", `Link validation failed: ${err.message}`);
+      stats.errorsCount++;
+    }
+  }
+
   // ── Complete run ──────────────────────────────────────────────────────────
   stats.durationMs = Date.now() - startedAt;
 
@@ -325,6 +346,9 @@ try {
   console.log(`\n${"═".repeat(64)}`);
   console.log(`  Done in ${dur}s`);
   console.log(`  Created: ${stats.festivalsCreated}  Updated: ${stats.festivalsUpdated}  Archived: ${stats.festivalsArchived}  Errors: ${stats.errorsCount}`);
+  if (!SKIP_LINKS) {
+    console.log(`  Links checked: ${stats.linksChecked ?? 0}  Broken: ${stats.linksBroken ?? 0}  Recovered: ${stats.linksRecovered ?? 0}`);
+  }
   console.log(`${"═".repeat(64)}\n`);
 
   process.exit(0);

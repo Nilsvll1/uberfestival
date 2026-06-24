@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ContainerScroll } from "@/components/ui/container-scroll-animation";
 import { TestimonialsSection } from "@/components/ui/testimonials-section";
 import { PricingSection } from "@/app/components/PricingSection";
+import { CredibilitySection } from "@/app/components/CredibilitySection";
 
 export const metadata: Metadata = {
   title: "UberFestival — Festival opportunities for music professionals",
@@ -15,17 +16,30 @@ export default function LandingPage() {
   return (
     <main
       className="text-white"
-      style={{ background: "#06060A" }}
+      style={{ background: "#030812" }}
     >
       {/* ── Hero scroll ──────────────────────────────────────────── */}
       <section className="relative overflow-hidden">
-        {/* Radial glow behind title */}
+        {/* ── Hero atmospheric lighting ── */}
+        {/* Crown — fills the space above the headline with indigo warmth */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          aria-hidden="true"
+          style={{
+            background: [
+              "radial-gradient(ellipse 100% 52% at 50% -2%, rgba(99,102,241,0.34) 0%, transparent 62%)",
+              "radial-gradient(ellipse 60% 38% at 12% 35%, rgba(59,130,246,0.12) 0%, transparent 68%)",
+              "radial-gradient(ellipse 60% 34% at 88% 26%, rgba(139,92,246,0.11) 0%, transparent 66%)",
+            ].join(", "),
+          }}
+        />
+        {/* Floor — device screen illuminating the space below it */}
         <div
           className="pointer-events-none absolute inset-0"
           aria-hidden="true"
           style={{
             background:
-              "radial-gradient(ellipse 80% 55% at 50% 0%, rgba(99,102,241,0.20) 0%, transparent 65%)",
+              "radial-gradient(ellipse 80% 28% at 50% 88%, rgba(67,56,202,0.22) 0%, rgba(37,99,235,0.06) 55%, transparent 75%)",
           }}
         />
 
@@ -155,12 +169,16 @@ export default function LandingPage() {
             alt="UberFestival — interactive festival map and open calls list"
             height={900}
             width={1600}
-            className="mx-auto rounded-2xl object-cover h-full object-top"
+            className="w-full object-cover h-full object-top"
+            style={{ filter: "brightness(1.05) contrast(1.07) saturate(1.10)" }}
             draggable={false}
             priority
           />
         </ContainerScroll>
       </section>
+
+      {/* ── Credibility ──────────────────────────────────────────── */}
+      <CredibilitySection />
 
       {/* ── Pricing ──────────────────────────────────────────────── */}
       <PricingSection />
@@ -173,7 +191,7 @@ export default function LandingPage() {
         <div
           className="grid grid-cols-3 gap-4 rounded-2xl p-6 md:p-8"
           style={{
-            background: "#0E0E16",
+            background: "#080D1C",
             border: "1px solid rgba(255,255,255,0.06)",
           }}
         >
@@ -300,7 +318,7 @@ export default function LandingPage() {
               key={feature.title}
               className="rounded-2xl p-6 flex flex-col gap-4"
               style={{
-                background: "#0E0E16",
+                background: "#080D1C",
                 border: "1px solid rgba(255,255,255,0.06)",
               }}
             >

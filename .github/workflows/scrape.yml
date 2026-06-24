@@ -1,12 +1,9 @@
 name: Festival Scraper
 
 on:
-  # Every Monday at 06:00 UTC — quiet time, low festival-server load.
-  schedule:
-    - cron: "0 6 * * 1"
-
-  # Allows manual trigger from the GitHub Actions UI.
-  # Set 'mode' to 'update', 'discover', or 'all'.
+  # DISABLED: replaced by pipeline.yml (node pipeline/run.mjs).
+  # Schedule removed to prevent Monday conflicts with the new pipeline.
+  # Kept for manual emergency use only.
   workflow_dispatch:
     inputs:
       mode:
