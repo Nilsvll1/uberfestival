@@ -205,7 +205,7 @@ const FestivalCard = memo(function FestivalCard({
             <span />
           )}
 
-          {festival.application_url && isPremium === false ? (
+          {(festival.application_url || festival.has_apply_url) && isPremium !== true ? (
             <a
               href="/#pricing"
               className="shrink-0 text-[11px] font-semibold px-2.5 py-1.5 rounded-[7px] inline-flex items-center gap-1"
@@ -216,14 +216,26 @@ const FestivalCard = memo(function FestivalCard({
               </svg>
               Premium
             </a>
-          ) : (festival.application_url || festival.website) ? (
+          ) : (festival.application_url || festival.has_apply_url) ? (
             <a
-              href={festival.application_url ?? festival.website ?? ""}
+              href={`/api/apply/${festival.id}`}
               target="_blank"
               rel="noopener noreferrer"
               className="btn-cta shrink-0 text-[11.5px] font-semibold px-2.5 py-1.5 rounded-[7px] inline-flex items-center gap-1"
             >
-              {festival.application_url ? t.card.apply : t.card.visitWebsite}
+              {t.card.apply}
+              <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                <path d="M2 8L8 2M4 2h4v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </a>
+          ) : festival.website ? (
+            <a
+              href={festival.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-cta shrink-0 text-[11.5px] font-semibold px-2.5 py-1.5 rounded-[7px] inline-flex items-center gap-1"
+            >
+              {t.card.visitWebsite}
               <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden="true">
                 <path d="M2 8L8 2M4 2h4v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>

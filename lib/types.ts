@@ -4,7 +4,10 @@ export type Festival = {
   city: string;
   country: string;
   category: string;
-  application_url: string;
+  /** Full URL — only present in premium-gated server contexts. Never sent in public RSC payloads. */
+  application_url?: string | null;
+  /** True when a festival has an apply URL; sent instead of the URL itself in public payloads. */
+  has_apply_url?: boolean;
   application_platform?: string;
   application_status?: string;
   application_source?: string;

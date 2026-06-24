@@ -81,7 +81,7 @@ export default async function FestivalPage({
     supabase
       .from("festivals")
       .select("id, festival_name, city, country, category, application_url, submission_deadline, latitude, longitude")
-      .eq("category", festival.category)
+      .eq("category", festival.category ?? "")
       .neq("id", Number(id))
       .limit(3),
     user
@@ -96,7 +96,14 @@ export default async function FestivalPage({
       : Promise.resolve({ data: null }),
   ]);
 
-  const { data: related } = relatedResult;
+  // Strip application_url from related festivals before they enter the RSC payload
+  // via FestivalCard (a client component). Replace with a boolean so the card
+  // can show the Premium gate or the /api/apply/[id] redirect appropriately.
+  const related = (relatedResult.data ?? []).map((f) => {
+    const { application_url, ...rest } = f as Festival;
+    return { ...rest, has_apply_url: !!application_url };
+  });
+
   const savedIds = (savedResult.data ?? []).map((s: { festival_id: number }) => s.festival_id);
   const isPremium: boolean | null = user ? (profileResult.data?.is_premium ?? false) : null;
 
@@ -138,7 +145,7 @@ export default async function FestivalPage({
       "url": "https://uberfestival.com",
     },
     ...(festival.category      ? { "about": festival.category }                     : {}),
-    ...(festival.application_url ? { "url": festival.application_url }              : {}),
+    ...(festival.website       ? { "url": festival.website }                        : {}),
     ...(festival.submission_deadline ? { "endDate": festival.submission_deadline }  : {}),
     ...(festival.description   ? { "description": festival.description }            : {}),
   };
@@ -221,7 +228,7 @@ export default async function FestivalPage({
 
           {/* Deadline + CTA */}
           <div className="flex items-center gap-4 mt-6 flex-wrap">
-            {festival.application_url && isPremium === false ? (
+            {festival.application_url && isPremium !== true ? (
               <a
                 href="/#pricing"
                 className="hero-apply-btn"
@@ -232,14 +239,26 @@ export default async function FestivalPage({
                 </svg>
                 Get Premium to Apply
               </a>
-            ) : (festival.application_url || festival.website) ? (
+            ) : festival.application_url ? (
               <a
-                href={festival.application_url ?? festival.website ?? ""}
+                href={`/api/apply/${festival.id}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hero-apply-btn"
               >
-                {festival.application_url ? t.festival.apply : t.festival.visitWebsite}
+                {t.festival.apply}
+                <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                  <path d="M2.5 9.5l7-7M4 2.5h5.5V8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </a>
+            ) : festival.website ? (
+              <a
+                href={festival.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hero-apply-btn"
+              >
+                {t.festival.visitWebsite}
                 <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
                   <path d="M2.5 9.5l7-7M4 2.5h5.5V8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
@@ -357,7 +376,7 @@ export default async function FestivalPage({
 
             {/* CTA */}
             <div className="mt-auto pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-              {festival.application_url && isPremium === false ? (
+              {festival.application_url && isPremium !== true ? (
                 <a
                   href="/#pricing"
                   className="flex items-center justify-center gap-2 w-full font-semibold py-3 rounded-[11px] transition-opacity hover:opacity-90"
@@ -374,15 +393,28 @@ export default async function FestivalPage({
                   </svg>
                   Get Premium to Apply
                 </a>
-              ) : (festival.application_url || festival.website) ? (
+              ) : festival.application_url ? (
                 <a
-                  href={festival.application_url ?? festival.website ?? ""}
+                  href={`/api/apply/${festival.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-cta flex items-center justify-center gap-2 w-full font-semibold py-3 rounded-[11px]"
                   style={{ fontSize: "14px" }}
                 >
-                  {festival.application_url ? t.festival.apply : t.festival.visitWebsite}
+                  {t.festival.apply}
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M2.5 9.5l7-7M4 2.5h5.5V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </a>
+              ) : festival.website ? (
+                <a
+                  href={festival.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-cta flex items-center justify-center gap-2 w-full font-semibold py-3 rounded-[11px]"
+                  style={{ fontSize: "14px" }}
+                >
+                  {t.festival.visitWebsite}
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                     <path d="M2.5 9.5l7-7M4 2.5h5.5V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
@@ -408,7 +440,7 @@ export default async function FestivalPage({
               }}
             >
               <FestivalMapWrapper
-                festivals={[festival as Festival]}
+                festivals={[{ ...festival, application_url: undefined } as Festival]}
                 className="h-full"
                 center={[festival.latitude, festival.longitude]}
                 zoom={11}

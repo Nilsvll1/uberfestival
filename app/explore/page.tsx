@@ -5,6 +5,7 @@ import { createClient } from "../../lib/supabase-server";
 import { supabaseAdmin } from "../../lib/supabase-admin";
 import { DEFAULT_LANGUAGE, LANG_COOKIE, isValidLanguage, getTranslations } from "../../lib/i18n";
 import SearchableFestivals from "../components/SearchableFestivals";
+import type { Festival } from "../../lib/types";
 
 // Festival list is the same for every visitor — cache it for 1 hour.
 // Invalidated immediately when admin approves/rejects via revalidateTag('festivals').
@@ -70,13 +71,21 @@ export default async function Home() {
     isPremium = profileResult.data?.is_premium ?? false;
   }
 
+  // Strip application_url before passing to the client component — it must never
+  // appear in the RSC payload. Replace with a boolean so FestivalCard can decide
+  // whether to show the Premium gate or the Apply button (via /api/apply/[id]).
+  const festivalsForClient = (data || []).map((f) => {
+    const { application_url, ...rest } = f as Festival;
+    return { ...rest, has_apply_url: !!application_url };
+  });
+
   const today = new Date().toISOString().slice(0, 10);
 
   return (
     <main className="flex-1 overflow-hidden">
       <Suspense>
         <SearchableFestivals
-          festivals={data || []}
+          festivals={festivalsForClient}
           userId={user?.id ?? null}
           savedIds={savedIds}
           today={today}

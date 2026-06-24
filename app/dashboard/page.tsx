@@ -58,8 +58,22 @@ export default async function DashboardPage() {
   const savedRows = (savedResult.data ?? []) as unknown as SavedRow[];
   const viewRows = (viewsResult.data ?? []) as unknown as ViewRow[];
 
-  const savedFestivals = savedRows.map((r) => r.festivals).filter(Boolean);
-  const recentFestivals = viewRows.map((r) => r.festivals).filter(Boolean);
+  // Strip application_url before passing festivals to FestivalCard (client component).
+  // Replace with a boolean so the card can show the Premium gate or /api/apply/[id].
+  const savedFestivals = savedRows
+    .map((r) => r.festivals)
+    .filter(Boolean)
+    .map((f) => {
+      const { application_url, ...rest } = f as Festival;
+      return { ...rest, has_apply_url: !!application_url };
+    });
+  const recentFestivals = viewRows
+    .map((r) => r.festivals)
+    .filter(Boolean)
+    .map((f) => {
+      const { application_url, ...rest } = f as Festival;
+      return { ...rest, has_apply_url: !!application_url };
+    });
 
   // Compute saved IDs for SaveButton state.
   const savedIds = savedFestivals.map((f) => f.id);
