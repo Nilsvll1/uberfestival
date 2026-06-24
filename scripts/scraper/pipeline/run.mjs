@@ -31,6 +31,7 @@
  *   node --env-file=.env pipeline/run.mjs --feed-id=3
  *   node --env-file=.env pipeline/run.mjs --skip-archive
  *   node --env-file=.env pipeline/run.mjs --skip-pages
+ *   node --env-file=.env pipeline/run.mjs --skip-festhome
  *
  * Required env:
  *   SUPABASE_URL
@@ -46,13 +47,15 @@ import { createFestival, updateFestival } from "./updater.mjs";
 import { archiveStale }           from "./archiver.mjs";
 import { createReporter }         from "./reporter.mjs";
 import { monitorFestivalPages }   from "./page-monitor.mjs";
+import { scrapeFesthome }         from "./festhome-scraper.mjs";
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
 const args         = process.argv.slice(2);
 const DRY_RUN      = args.includes("--dry-run");
 const FEED_ID      = parseInt(args.find((a) => a.startsWith("--feed-id="))?.split("=")[1] ?? "0", 10);
 const SKIP_ARCHIVE = args.includes("--skip-archive");
-const SKIP_PAGES   = args.includes("--skip-pages");
+const SKIP_PAGES    = args.includes("--skip-pages");
+const SKIP_FESTHOME = args.includes("--skip-festhome");
 
 // Politeness: wait between feed fetches so we don't hammer source servers
 const FEED_DELAY_MS = 1_500;
@@ -170,6 +173,21 @@ try {
     }
 
     await sleep(FEED_DELAY_MS);
+  }
+
+  // ── Source A2: Festhome open-call scraper ────────────────────────────────
+  if (!SKIP_FESTHOME) {
+    console.log(`\n── Phase A2: Festhome scraper`);
+    const festhomeCandidates = await scrapeFesthome(index, reporter, runId, DRY_RUN);
+
+    for (const { record, baseConfidence } of festhomeCandidates) {
+      const { match } = index.findMatch(record);
+      if (match) {
+        updateCandidates.push({ existingId: match.id, existing: match, record });
+      } else {
+        newCandidates.push({ record, baseConfidence });
+      }
+    }
   }
 
   // ── Source A3: Curated festival page monitor ──────────────────────────────
