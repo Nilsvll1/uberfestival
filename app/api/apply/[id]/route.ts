@@ -33,34 +33,38 @@ export async function GET(
   // Use service role so RLS doesn't interfere with the lookup.
   const { data: festival } = await supabaseAdmin
     .from("festivals")
-    .select("application_url, application_url_secondary, website, link_check_status")
+    .select("application_url, application_url_secondary, application_email, website, link_check_status")
     .eq("id", id)
     .single();
 
-  if (!festival?.application_url) {
+  // Cascade: URL primary → URL secondary → email → website → festival page
+  const BROKEN = new Set(["not_found", "redirect_unrelated", "parked", "dead_domain", "timeout", "error"]);
+  const primaryBroken = festival?.link_check_status && BROKEN.has(festival.link_check_status);
+
+  let rawUrl: string | null = null;
+
+  if (festival?.application_url && !primaryBroken) {
+    rawUrl = festival.application_url;
+  } else if (festival?.application_url_secondary) {
+    rawUrl = festival.application_url_secondary;
+  } else if (festival?.application_email) {
+    rawUrl = `mailto:${festival.application_email}`;
+  } else if (festival?.website) {
+    rawUrl = festival.website;
+  }
+
+  if (!rawUrl) {
     return NextResponse.redirect(`${origin}/festival/${id}`);
   }
 
-  // Cascade: primary → secondary (if primary is known-broken) → website
-  // "unchecked" and "ok" statuses always use the primary URL.
-  const BROKEN = new Set(["not_found", "redirect_unrelated", "parked", "dead_domain", "timeout", "error"]);
-  const primaryBroken = festival.link_check_status && BROKEN.has(festival.link_check_status);
-
-  const rawUrl = primaryBroken && festival.application_url_secondary
-    ? festival.application_url_secondary
-    : primaryBroken && festival.website
-    ? festival.website
-    : festival.application_url;
-
-  // Validate the stored URL before issuing the redirect.
-  // Prevents open-redirect if a bad value ever reaches the DB.
+  // Validate before redirecting — prevents open-redirect if bad data reaches the DB.
   let applyUrl: URL;
   try {
     applyUrl = new URL(rawUrl);
   } catch {
     return NextResponse.redirect(`${origin}/festival/${id}`);
   }
-  if (!["http:", "https:"].includes(applyUrl.protocol)) {
+  if (!["http:", "https:", "mailto:"].includes(applyUrl.protocol)) {
     return NextResponse.redirect(`${origin}/festival/${id}`);
   }
 
