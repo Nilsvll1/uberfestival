@@ -202,29 +202,28 @@ const INVITATION_ONLY_NAMES = new Set([
 
 // ── Classifier ────────────────────────────────────────────────────────────────
 
+const PLATFORM_URL_RE = /filmfreeway\.com|festhome\.com|submittable\.com|jotform\.com|typeform\.com|docs\.google\.com|eventival\.com|wufoo\.com|formstack\.com|airtable\.com/i;
+
 function classify(festival) {
+  const name = (festival.festival_name ?? "").trim();
+  const genre = festival.category ?? "";
+
+  // Name-based invitation-only check runs FIRST — prevents bad application_url data
+  // (e.g. French text, stale news URLs) from wrongly overriding a known invite-only festival.
+  // Exception: if the URL is a recognised platform link (FilmFreeway showcase etc.), allow open_call.
+  const isNameInviteOnly = INVITATION_ONLY_NAMES.has(name) ||
+    [...INVITATION_ONLY_NAMES].some((n) => name.toLowerCase().startsWith(n.toLowerCase()));
+  const isGenreInviteOnly = INVITATION_ONLY_GENRES.has(genre);
+
+  if (isNameInviteOnly || isGenreInviteOnly) {
+    // If the festival has a recognised platform link, treat as open_call (they have a showcase stage)
+    const hasPlatformUrl = festival.application_url && PLATFORM_URL_RE.test(festival.application_url);
+    if (!hasPlatformUrl) return "invitation_only";
+  }
+
   // Confirmed open call — has an actionable application path
   if (festival.application_url || festival.application_email) {
     return "open_call";
-  }
-
-  // Name-based: known commercial / invite-only festivals
-  const name = (festival.festival_name ?? "").trim();
-  if (INVITATION_ONLY_NAMES.has(name)) {
-    return "invitation_only";
-  }
-
-  // Partial name match for variants (e.g. "Tomorrowland Winter")
-  for (const n of INVITATION_ONLY_NAMES) {
-    if (name.toLowerCase().startsWith(n.toLowerCase())) {
-      return "invitation_only";
-    }
-  }
-
-  // Genre-based: DJ/producer-invite structural model
-  const genre = festival.category ?? "";
-  if (INVITATION_ONLY_GENRES.has(genre)) {
-    return "invitation_only";
   }
 
   return "unknown";
