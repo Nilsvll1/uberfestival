@@ -1,11 +1,11 @@
 import { PostgrestClient } from "@supabase/postgrest-js";
 
-const rawUrl = process.env.SUPABASE_URL;
+const rawUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!rawUrl || !key) {
   throw new Error(
-    "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables."
+    "Missing SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) or SUPABASE_SERVICE_ROLE_KEY environment variables."
   );
 }
 
