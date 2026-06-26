@@ -32,7 +32,7 @@ export default async function AdminPage() {
   const db = supabaseAdmin;
 
   // ── Data fetching ──────────────────────────────────────────────────────────
-  const [stagingRes, needsAttentionRes, sourcesRes, statsRes, rssFeedsRes, pipelineRunsRes, festivalPagesRes, linkHealthRes] = await Promise.all([
+  const [stagingRes, needsAttentionRes, sourcesRes, statsRes, rssFeedsRes, pipelineRunsRes, festivalPagesRes, linkHealthRes, coverageRes] = await Promise.all([
     db.from("festival_staging").select("*").eq("status", "pending").order("created_at", { ascending: false }).limit(50),
     db.from("festivals").select("id, festival_name, city, country, scrape_status, scrape_error, application_url, last_scraped_at")
       .in("scrape_status", ["dead_link", "failed", "manual_review"])
@@ -61,6 +61,11 @@ export default async function AdminPage() {
         .order("link_check_at", { ascending: false })
         .limit(20),
     ]),
+    Promise.all([
+      db.from("festivals").select("id", { count: "exact", head: true }).eq("booking_model", "open_call").eq("is_archived", false),
+      db.from("festivals").select("id", { count: "exact", head: true }).eq("booking_model", "invitation_only").eq("is_archived", false),
+      db.from("festivals").select("id", { count: "exact", head: true }).eq("booking_model", "unknown").eq("is_archived", false),
+    ]),
   ]);
 
   const staged: StagedFestival[] = (stagingRes.data ?? []) as StagedFestival[];
@@ -85,6 +90,15 @@ export default async function AdminPage() {
     last_open_at: string | null; is_active: boolean;
   }>;
   const [totalFestivals, pendingStaging, deadLinks, archivedCount] = statsRes;
+
+  const [openCallRes, inviteOnlyRes, unknownRes] = coverageRes;
+  const coverageOpenCall   = openCallRes.count ?? 0;
+  const coverageInvite     = inviteOnlyRes.count ?? 0;
+  const coverageUnknown    = unknownRes.count ?? 0;
+  const coverageDenominator = coverageOpenCall + coverageUnknown;
+  const coveragePct        = coverageDenominator > 0
+    ? Math.round((coverageOpenCall / coverageDenominator) * 100) : 0;
+  const coverageGap        = Math.max(0, Math.ceil(coverageDenominator * 0.8) - coverageOpenCall);
 
   return (
     <main style={{ background: "var(--bg)", minHeight: "100vh" }}>
@@ -174,6 +188,38 @@ export default async function AdminPage() {
                 </tbody>
               </table>
             </div>
+          )}
+        </Section>
+
+        {/* ── Coverage ── */}
+        <Section title="Application path coverage"
+          subtitle="Effective coverage = open_call / (open_call + unknown). invitation_only festivals are excluded — they have no public application process.">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div className="rounded-[12px] border px-4 py-2.5 text-center" style={{ background: "#fff", borderColor: "var(--border)" }}>
+              <p className="font-extrabold tabular-nums"
+                style={{ fontSize: "20px", letterSpacing: "-0.03em",
+                  color: coveragePct >= 80 ? "#059669" : coveragePct >= 50 ? "#D97706" : "#DC2626" }}>
+                {coveragePct}%
+              </p>
+              <p style={{ fontSize: "10.5px", color: "var(--text-muted)" }}>Coverage (target 80%)</p>
+            </div>
+            <div className="rounded-[12px] border px-4 py-2.5 text-center" style={{ background: "#fff", borderColor: "var(--border)" }}>
+              <p className="font-extrabold tabular-nums" style={{ fontSize: "20px", color: "#059669", letterSpacing: "-0.03em" }}>{coverageOpenCall}</p>
+              <p style={{ fontSize: "10.5px", color: "var(--text-muted)" }}>Open call (with path)</p>
+            </div>
+            <div className="rounded-[12px] border px-4 py-2.5 text-center" style={{ background: "#fff", borderColor: "var(--border)" }}>
+              <p className="font-extrabold tabular-nums" style={{ fontSize: "20px", color: "var(--text-muted)", letterSpacing: "-0.03em" }}>{coverageUnknown}</p>
+              <p style={{ fontSize: "10.5px", color: "var(--text-muted)" }}>Unknown (no path yet)</p>
+            </div>
+            <div className="rounded-[12px] border px-4 py-2.5 text-center" style={{ background: "#fff", borderColor: "var(--border)" }}>
+              <p className="font-extrabold tabular-nums" style={{ fontSize: "20px", color: "var(--text-muted)", letterSpacing: "-0.03em" }}>{coverageInvite}</p>
+              <p style={{ fontSize: "10.5px", color: "var(--text-muted)" }}>Invite-only (excluded)</p>
+            </div>
+          </div>
+          {coverageGap > 0 && (
+            <p style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+              {coverageGap} more application paths needed to reach 80% of {coverageDenominator} addressable festivals.
+            </p>
           )}
         </Section>
 
