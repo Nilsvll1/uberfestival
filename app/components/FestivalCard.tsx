@@ -10,6 +10,7 @@ import type { Language } from "../../lib/i18n";
 import { getTranslations } from "../../lib/i18n";
 import SaveButton from "./SaveButton";
 import FestivalImage from "./FestivalImage";
+import { ApplicationStatusBadge, isApplyNowStatus } from "./ApplicationStatusBadge";
 
 // Premium layered shadow — Linear/Stripe style
 const SHADOW_BASE =
@@ -205,7 +206,7 @@ const FestivalCard = memo(function FestivalCard({
             <span />
           )}
 
-          {(festival.application_url || festival.has_apply_url) && isPremium !== true ? (
+          {isApplyNowStatus(festival.application_status) && isPremium !== true ? (
             <a
               href="/#pricing"
               className="shrink-0 text-[11px] font-semibold px-2.5 py-1.5 rounded-[7px] inline-flex items-center gap-1"
@@ -216,7 +217,7 @@ const FestivalCard = memo(function FestivalCard({
               </svg>
               Premium
             </a>
-          ) : (festival.application_url || festival.has_apply_url) ? (
+          ) : isApplyNowStatus(festival.application_status) ? (
             <a
               href={`/api/apply/${festival.id}`}
               target="_blank"
@@ -228,6 +229,10 @@ const FestivalCard = memo(function FestivalCard({
                 <path d="M2 8L8 2M4 2h4v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </a>
+          ) : festival.application_status === "contact_submission" ? (
+            <ApplicationStatusBadge status="contact_submission" />
+          ) : festival.application_status === "invitation_only" || festival.application_status === "seasonally_closed" ? (
+            <ApplicationStatusBadge status={festival.application_status} />
           ) : festival.website ? (
             <a
               href={festival.website}

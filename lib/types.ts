@@ -9,7 +9,8 @@ export type Festival = {
   /** True when a festival has an apply URL; sent instead of the URL itself in public payloads. */
   has_apply_url?: boolean;
   application_platform?: string;
-  application_status?: string;
+  application_status?: "verified_application" | "email_submission" | "filmfreeway" | "festhome" | "contact_form" | "contact_submission" | "invitation_only" | "seasonally_closed" | "unknown";
+  contact_form_url?: string | null;
   application_source?: string;
   application_verified_at?: string;
   application_confidence?: number;

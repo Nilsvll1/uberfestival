@@ -11,6 +11,7 @@ import { formatDeadline, genreColor } from "../../../lib/utils";
 import { getFestivalImage, getMood, getAtmosphericText } from "../../../lib/festivalImage";
 import { getTranslations, isValidLanguage, DEFAULT_LANGUAGE, LANG_COOKIE } from "../../../lib/i18n";
 import type { Festival } from "../../../lib/types";
+import { ApplicationStatusBadge, isApplyNowStatus } from "../../components/ApplicationStatusBadge";
 
 export async function generateMetadata({
   params,
@@ -106,6 +107,7 @@ export default async function FestivalPage({
 
   const savedIds = (savedResult.data ?? []).map((s: { festival_id: number }) => s.festival_id);
   const isPremium: boolean | null = user ? (profileResult.data?.is_premium ?? false) : null;
+  const isSavedByUser = savedIds.includes(festival.id);
 
   const deadline  = formatDeadline(festival.submission_deadline, lang);
   const color     = festival.category ? genreColor(festival.category) : null;
@@ -228,7 +230,7 @@ export default async function FestivalPage({
 
           {/* Deadline + CTA */}
           <div className="flex items-center gap-4 mt-6 flex-wrap">
-            {festival.application_url && isPremium !== true ? (
+            {isApplyNowStatus(festival.application_status) && isPremium !== true ? (
               <a
                 href="/#pricing"
                 className="hero-apply-btn"
@@ -239,7 +241,7 @@ export default async function FestivalPage({
                 </svg>
                 Get Premium to Apply
               </a>
-            ) : festival.application_url ? (
+            ) : isApplyNowStatus(festival.application_status) ? (
               <a
                 href={`/api/apply/${festival.id}`}
                 target="_blank"
@@ -264,6 +266,9 @@ export default async function FestivalPage({
                 </svg>
               </a>
             ) : null}
+            {(festival.application_status === "invitation_only" || festival.application_status === "seasonally_closed") && (
+              <ApplicationStatusBadge status={festival.application_status} size="md" />
+            )}
             {deadline && (
               <span
                 className="text-[12.5px] font-medium"
@@ -376,7 +381,7 @@ export default async function FestivalPage({
 
             {/* CTA */}
             <div className="mt-auto pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-              {festival.application_url && isPremium !== true ? (
+              {isApplyNowStatus(festival.application_status) && isPremium !== true ? (
                 <a
                   href="/#pricing"
                   className="flex items-center justify-center gap-2 w-full font-semibold py-3 rounded-[11px] transition-opacity hover:opacity-90"
@@ -393,7 +398,7 @@ export default async function FestivalPage({
                   </svg>
                   Get Premium to Apply
                 </a>
-              ) : festival.application_url ? (
+              ) : isApplyNowStatus(festival.application_status) ? (
                 <a
                   href={`/api/apply/${festival.id}`}
                   target="_blank"
@@ -406,6 +411,106 @@ export default async function FestivalPage({
                     <path d="M2.5 9.5l7-7M4 2.5h5.5V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </a>
+              ) : festival.application_status === "contact_submission" ? (
+                <div className="flex flex-col gap-3">
+                  <ApplicationStatusBadge status="contact_submission" size="md" />
+                  <p style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                    No public application portal found. Reach out directly to inquire about performing.
+                  </p>
+                  {festival.application_email && (
+                    <a
+                      href={`mailto:${festival.application_email}`}
+                      className="flex items-center justify-center gap-2 w-full font-semibold py-3 rounded-[11px] transition-opacity hover:opacity-80"
+                      style={{
+                        fontSize: "14px",
+                        background: "rgba(99,102,241,0.08)",
+                        color: "#6366F1",
+                        border: "1px solid rgba(99,102,241,0.20)",
+                        textDecoration: "none",
+                      }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 14 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="1" y="2" width="12" height="9" rx="1.5"/>
+                        <path d="M1 3l6 4 6-4"/>
+                      </svg>
+                      Email to Inquire
+                    </a>
+                  )}
+                  {festival.contact_form_url && !festival.application_email && (
+                    <a
+                      href={festival.contact_form_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 w-full font-semibold py-3 rounded-[11px] transition-opacity hover:opacity-80"
+                      style={{
+                        fontSize: "14px",
+                        background: "rgba(99,102,241,0.08)",
+                        color: "#6366F1",
+                        border: "1px solid rgba(99,102,241,0.20)",
+                        textDecoration: "none",
+                      }}
+                    >
+                      Contact Form
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M2.5 9.5l7-7M4 2.5h5.5V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </a>
+                  )}
+                </div>
+              ) : festival.application_status === "invitation_only" ? (
+                <div className="flex flex-col items-center gap-2">
+                  <ApplicationStatusBadge status="invitation_only" size="md" />
+                  {festival.website && (
+                    <a
+                      href={festival.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-cta flex items-center justify-center gap-2 w-full font-semibold py-3 rounded-[11px] mt-1"
+                      style={{ fontSize: "14px" }}
+                    >
+                      {t.festival.visitWebsite}
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M2.5 9.5l7-7M4 2.5h5.5V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </a>
+                  )}
+                </div>
+              ) : festival.application_status === "seasonally_closed" ? (
+                <div className="flex flex-col items-center gap-2">
+                  <ApplicationStatusBadge status="seasonally_closed" size="md" />
+                  {isSavedByUser && isPremium === true ? (
+                    <div
+                      className="flex items-center gap-2 rounded-[10px] px-3 py-2 w-full"
+                      style={{ background: "rgba(22,163,74,0.07)", border: "1px solid rgba(22,163,74,0.18)" }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#16A34A" strokeWidth="1.5" strokeLinecap="round">
+                        <circle cx="7" cy="7" r="5.5"/>
+                        <path d="M7 4v3.5l2 2"/>
+                      </svg>
+                      <p style={{ fontSize: "12px", color: "#15803D", fontWeight: 500 }}>
+                        You&apos;ll be notified when applications open.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-center" style={{ color: "var(--text-muted)", fontSize: "12px" }}>
+                      Applications are seasonal — check back closer to the event.
+                    </p>
+                  )}
+                  {festival.website && (
+                    <a
+                      href={festival.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-cta flex items-center justify-center gap-2 w-full font-semibold py-3 rounded-[11px]"
+                      style={{ fontSize: "14px" }}
+                    >
+                      {t.festival.visitWebsite}
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M2.5 9.5l7-7M4 2.5h5.5V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </a>
+                  )}
+                </div>
               ) : festival.website ? (
                 <a
                   href={festival.website}

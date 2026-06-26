@@ -134,6 +134,17 @@ export default function UserMenu({ user }: { user: User | null }) {
               onClick={() => setOpen(false)}
             />
             <MenuItem
+              href="/dashboard/opportunities"
+              icon={
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="7" cy="7" r="5.5"/>
+                  <path d="M5 7l1.5 1.5L9.5 5"/>
+                </svg>
+              }
+              label={lang === "fr" ? "Opportunités" : "Opportunities"}
+              onClick={() => setOpen(false)}
+            />
+            <MenuItem
               href="/dashboard/profile"
               icon={
                 <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">

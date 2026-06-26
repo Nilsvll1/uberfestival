@@ -263,13 +263,22 @@ export default async function DashboardPage() {
               </svg>
             }
           />
-          <Link
-            href="/explore"
-            style={{ fontSize: "13px", color: "var(--accent)", textDecoration: "none" }}
-            className="hover:opacity-70 transition-opacity"
-          >
-            {lang === "fr" ? "Explorer →" : "Explore →"}
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/dashboard/opportunities"
+              style={{ fontSize: "13px", color: "var(--accent)", textDecoration: "none" }}
+              className="hover:opacity-70 transition-opacity font-medium"
+            >
+              {lang === "fr" ? "Opportunités →" : "Opportunities →"}
+            </Link>
+            <Link
+              href="/explore"
+              style={{ fontSize: "13px", color: "var(--text-muted)", textDecoration: "none" }}
+              className="hover:opacity-70 transition-opacity"
+            >
+              {lang === "fr" ? "Explorer →" : "Explore →"}
+            </Link>
+          </div>
         </div>
 
         {savedFestivals.length === 0 ? (
