@@ -146,6 +146,58 @@ const INVITATION_ONLY_NAMES = new Set([
   "Club Skirts Dinah Shore Weekend",
   "Output Festival",
   "Mayday",
+
+  // Opera / classical — programmed by artistic directors, no public calls
+  "Bayreuth Festival",
+  "Glyndebourne Festival Opera",
+  "Glyndebourne",
+  "Salzburg Festival",
+  "Edinburgh International Festival",
+  "BBC Proms",
+  "Verbier Festival",
+  "Lucerne Festival",
+  "Aix-en-Provence Festival",
+  "Festival d'Aix-en-Provence",
+
+  // Large commercial country / mainstream
+  "CMA Music Festival",
+  "Country Thunder",
+  "Watershed Festival",
+  "Faster Horses",
+  "Boots in the Park",
+
+  // Large commercial European
+  "Roskilde",
+  "Sziget Festival",
+  "Sziget",
+  "Rock am Ring",
+  "Rock im Park",
+  "Hurricane Festival",
+  "Southside Festival",
+  "Nova Rock",
+  "Greenfield Festival",
+  "Greenfield",
+  "Baloise Session",
+  "Montreux Jazz Festival",
+  "North Sea Jazz Festival",
+
+  // UK commercial
+  "The Great Escape",
+  "TRNSMT",
+  "Victorious Festival",
+  "Boardmasters",
+  "Latitude Festival",
+  "End of the Road Festival",
+
+  // Large North American
+  "Desert Trip",
+  "Global Citizen Festival",
+  "iHeartRadio Music Festival",
+  "KAABOO",
+  "Firefly Music Festival",
+  "Hangout Music Festival",
+  "Watershed",
+  "Country Thunder USA",
 ]);
 
 // ── Classifier ────────────────────────────────────────────────────────────────

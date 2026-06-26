@@ -144,11 +144,19 @@ async function guessUrl(festival, baseUrl) {
     }),
   );
 
-  // Reject redirects to news/blog/archive pages — these are stale false positives
-  const STALE_RE = /\/(news|blog|press|archive|post|article|media|2\d{3})\//i;
+  const festivalHost = new URL(baseUrl).hostname.replace(/^www\./, "");
+  const STALE_RE = /\/(news|blog|press|archive|post|article|media)(\/|$)/i;
+  const BAD_PATH_RE = /\/ticket(s|ing|-office)?|\/buy|\/shop(\/|$)|\/store(\/|$)/i;
 
   for (const url of results.filter(Boolean)) {
-    if (STALE_RE.test(url)) continue;
+    if (STALE_RE.test(url) || BAD_PATH_RE.test(url)) continue;
+
+    // If the redirect landed on a completely different domain, only accept it
+    // when it's a known platform (filmfreeway, typeform, etc.)
+    const resultHost = (() => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return null; } })();
+    const isFestivalDomain = resultHost === festivalHost || resultHost?.endsWith("." + festivalHost);
+    if (!isFestivalDomain && detectPlatform(url) === "official") continue;
+
     const confirmed = await confirmApplyPage(url, festival.festival_name);
     if (confirmed) return { ...confirmed, source: `url_guess` };
   }
@@ -206,11 +214,14 @@ async function deepCrawl(festival, baseUrl) {
     return { url: link.url, platform: detectPlatform(link.url), confidence: 0.80, source: "homepage_platform" };
   }
 
+  const CRAWL_BAD_RE = /\/ticket(s|ing|-office)?|\/buy|\/shop(\/|$)|\/store(\/|$)|\/media(\/|$)|\/press(\/|$)|\/news\//i;
+
   // Follow apply-related internal links (up to 5)
   for (const link of links.filter((l) => !l.isPlatform)) {
     try {
       if (new URL(link.url).hostname !== new URL(baseUrl).hostname) continue;
     } catch { continue; }
+    if (CRAWL_BAD_RE.test(link.url)) continue;
 
     const confirmed = await confirmApplyPage(link.url, festival.festival_name);
     if (confirmed) return { ...confirmed, source: `crawl:${link.url}` };
@@ -228,7 +239,13 @@ const CONFIRM_KEYWORDS = [
   /\bperform\s+at\b/i, /\bplay\s+at\b/i, /want\s+to\s+perform/i,
 ];
 
+// URL patterns that signal a bad confirmation target (ticket pages, media sections, etc.)
+const BAD_CONFIRM_RE = /\/ticket(s|ing|-office)?|\/buy(-tickets)?|\/shop(\/|$)|\/store(\/|$)|\/media(\/|$)|\/press(\/|$)|\/news\/|\/(2\d{3})\//i;
+
 async function confirmApplyPage(url, festivalName) {
+  // Reject obviously wrong page types before fetching
+  if (BAD_CONFIRM_RE.test(url)) return null;
+
   const { html, status } = await fetchPage(url, { retries: 0, timeoutMs: 10_000 });
   if (!html || !status) return null;
 
@@ -242,9 +259,9 @@ async function confirmApplyPage(url, festivalName) {
   const confidence = platform !== "official" ? 0.88
     : hasForm && hits >= 2 ? 0.82
     : hasForm || hits >= 2 ? 0.72
-    : 0.62;
+    : null; // reject single-keyword or keyword-only with no form
 
-  if (confidence < 0.62) return null;
+  if (!confidence) return null;
 
   return { url, platform, confidence };
 }
@@ -277,20 +294,16 @@ const GENERIC_WORDS = new Set([
 
 function nameOnPage(html, name) {
   if (!name || !html) return false;
-  // Only consider words that are distinctive (long enough, not generic)
-  const words = name.toLowerCase()
-    .split(/\s+/)
-    .filter((w) => w.length > 4 && !GENERIC_WORDS.has(w));
-  if (!words.length) {
-    // Fall back to any long word match if all are generic
-    const fallback = name.toLowerCase().split(/\s+/).filter((w) => w.length > 4);
-    if (!fallback.length) return true;
-    const text = (typeof html === "string" ? html : "").toLowerCase();
-    return fallback.some((w) => text.includes(w));
-  }
   const text = (typeof html === "string" ? html : "").toLowerCase();
-  // Require at least one distinctive word to match
-  return words.some((w) => text.includes(w));
+  // Prefer distinctive words (len > 4, not generic)
+  const distinctive = name.toLowerCase().split(/\s+/)
+    .filter((w) => w.length > 4 && !GENERIC_WORDS.has(w));
+  if (distinctive.length) return distinctive.some((w) => text.includes(w));
+  // Fall back to any word >= 3 chars (handles short names like "The Fest")
+  const anyWord = name.toLowerCase().split(/\s+/).filter((w) => w.length >= 3 && !GENERIC_WORDS.has(w));
+  if (anyWord.length) return anyWord.some((w) => text.includes(w));
+  // Name is entirely generic words — require slug in URL instead
+  return false;
 }
 
 function normalizeUrl(website) {
