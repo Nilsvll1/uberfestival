@@ -122,7 +122,7 @@ export default async function CheckoutSuccessPage({
           style={{ fontSize: "15px", color: "rgba(255,255,255,0.42)" }}
         >
           {confirmed
-            ? "Your subscription is active. You now have access to 1,100+ verified festivals, application links, and deadline tracking — worldwide."
+            ? "Your subscription is active. You now have access to 1,000+ verified festivals, application links, and deadline tracking — worldwide."
             : "Payment received. Your Premium access is being activated — it'll be ready in a moment."}
         </p>
 
@@ -148,7 +148,7 @@ export default async function CheckoutSuccessPage({
           <div className="flex flex-col gap-3">
             {[
               "Festival application links — apply directly",
-              "Access to 1,100+ festivals worldwide",
+              "Access to 1,000+ festivals worldwide",
               "Submission deadline tracking",
               "Unlimited favorites",
               "Worldwide festival map",
