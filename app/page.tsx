@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { unstable_cache } from "next/cache";
 import { ContainerScroll } from "@/components/ui/container-scroll-animation";
 import { TestimonialsSection } from "@/components/ui/testimonials-section";
 import { PricingSection } from "@/app/components/PricingSection";
 import { CredibilitySection } from "@/app/components/CredibilitySection";
+import { supabaseAdmin } from "../lib/supabase-admin";
 
 export const metadata: Metadata = {
   title: "UberFestival — Festival opportunities for music professionals",
@@ -12,7 +14,26 @@ export const metadata: Metadata = {
     "Discover open calls from festivals worldwide. Save opportunities, track deadlines, and grow your music career.",
 };
 
-export default function LandingPage() {
+const getStats = unstable_cache(
+  async () => {
+    const APPLY_STATUSES = ["verified_application", "filmfreeway", "festhome", "email_submission", "contact_form"];
+    const [applyRes, countryRes] = await Promise.all([
+      supabaseAdmin.from("festivals").select("id", { count: "exact", head: true })
+        .in("application_status", APPLY_STATUSES).eq("is_archived", false),
+      supabaseAdmin.from("festivals").select("country").eq("is_archived", false).not("country", "is", null),
+    ]);
+    const applyCount = applyRes.count ?? 0;
+    const countries = new Set((countryRes.data ?? []).map((r: { country: string }) => r.country)).size;
+    return { applyCount, countries };
+  },
+  ["landing-stats"],
+  { tags: ["festivals"], revalidate: 3600 }
+);
+
+export default async function LandingPage() {
+  const { applyCount, countries } = await getStats();
+  const applyLabel = applyCount >= 300 ? "300+" : applyCount >= 200 ? "200+" : `${applyCount}+`;
+  const countryLabel = countries >= 60 ? "60+" : countries >= 40 ? "40+" : `${countries}+`;
   return (
     <main
       className="text-white"
@@ -66,7 +87,7 @@ export default function LandingPage() {
                     letterSpacing: "0.10em",
                   }}
                 >
-                  Live — 200+ open calls worldwide
+                  Live — {applyLabel} open calls worldwide
                 </span>
               </div>
 
@@ -196,8 +217,8 @@ export default function LandingPage() {
           }}
         >
           {[
-            { value: "200+", label: "Open calls" },
-            { value: "40+", label: "Countries" },
+            { value: applyLabel, label: "Open calls" },
+            { value: countryLabel, label: "Countries" },
             { value: "20+", label: "Music genres" },
           ].map((stat, i) => (
             <div

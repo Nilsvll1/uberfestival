@@ -1,22 +1,26 @@
 // No "use client" — CSS animation, fully server-renderable.
 
 const FESTIVALS = [
+  "Glastonbury",
+  "Coachella",
   "SXSW",
-  "Sundance",
-  "Tribeca",
-  "Berlinale",
-  "Annecy",
-  "TIFF",
-  "Raindance",
-  "Fantasia",
+  "Roskilde",
+  "Primavera Sound",
+  "Tomorrowland",
+  "Bonnaroo",
+  "Rock Werchter",
+  "Download Festival",
+  "Fuji Rock",
+  "Pukkelpop",
+  "Pinkpop",
 ];
 
 // Duplicated so the loop is invisible at the -50% seam.
 const ITEMS = [...FESTIVALS, ...FESTIVALS];
 
 const STATS = [
-  { value: "1,100+", label: "Festivals" },
-  { value: "48",     label: "Countries" },
+  { value: "1,000+", label: "Festivals" },
+  { value: "120+",   label: "Countries" },
   { value: "Weekly", label: "Updates"   },
 ];
 

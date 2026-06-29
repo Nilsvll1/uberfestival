@@ -14,7 +14,7 @@ const getFestivals = unstable_cache(
     const { data, error } = await supabaseAdmin
       .from("festivals")
       .select(
-        "id, festival_name, city, country, category, application_url, submission_deadline, latitude, longitude, website, hero_image_url, description"
+        "id, festival_name, city, country, category, application_url, application_status, submission_deadline, latitude, longitude, website, hero_image_url, description"
       )
       .neq("is_archived", true);
     return { data, error };
