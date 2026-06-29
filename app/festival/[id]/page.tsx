@@ -81,7 +81,7 @@ export default async function FestivalPage({
   const [relatedResult, savedResult, profileResult] = await Promise.all([
     supabase
       .from("festivals")
-      .select("id, festival_name, city, country, category, application_url, submission_deadline, latitude, longitude")
+      .select("id, festival_name, city, country, category, application_url, application_status, submission_deadline, latitude, longitude, website, hero_image_url")
       .eq("category", festival.category ?? "")
       .neq("id", Number(id))
       .limit(3),

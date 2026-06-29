@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, useInView, AnimatePresence } from "motion/react";
 
 const FEATURES = [
-  "Access to 1,100+ festivals worldwide",
+  "Access to 1,000+ festivals worldwide",
   "Verified festival profiles",
   "Festival descriptions and insights",
   "Festival application links",
@@ -22,7 +22,7 @@ const FEATURES = [
 
 const BENEFITS = [
   {
-    label: "Access 1,100+ festivals worldwide",
+    label: "Access 1,000+ festivals worldwide",
     svg: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="10" />
@@ -54,42 +54,42 @@ const BENEFITS = [
 const TESTIMONIALS = [
   {
     id: 1,
-    name: "Elena Vasquez",
-    role: "Independent Film Director",
+    name: "Léa Dupont",
+    role: "Electronic Producer",
     content:
-      "I submitted to 12 festivals in one afternoon using the application links. What used to take me a week now takes a few hours.",
+      "Submitted to 8 festivals in one afternoon using the application links. What used to take me a week now takes a few hours.",
     avatar: "https://randomuser.me/api/portraits/women/68.jpg",
   },
   {
     id: 2,
-    name: "James Hartley",
-    role: "Documentary Producer",
+    name: "James Okafor",
+    role: "Touring DJ",
     content:
       "The verified application links alone are worth it. No more hunting across three different websites just to find the submission form.",
     avatar: "https://randomuser.me/api/portraits/men/41.jpg",
   },
   {
     id: 3,
-    name: "Sophie Laurent",
-    role: "Festival Programmer",
+    name: "Sofia Martínez",
+    role: "Jazz Vocalist",
     content:
-      "The database is genuinely comprehensive. We receive submissions from countries we'd never reached before — filmmakers are clearly finding us through platforms like this.",
+      "The database is genuinely comprehensive. I found opportunities in countries I'd never thought to apply to — and got booked.",
     avatar: "https://randomuser.me/api/portraits/women/57.jpg",
   },
   {
     id: 4,
-    name: "Marcus Chen",
-    role: "Short Film Director",
+    name: "Dev Sharma",
+    role: "Electronic Artist",
     content:
-      "Found a festival in Seoul I had no idea was accepting submissions. Applied, got selected. That single discovery paid for years of subscription.",
+      "Found a festival in Southeast Asia I had no idea was accepting submissions. Applied, got selected. That single booking paid for years of subscription.",
     avatar: "https://randomuser.me/api/portraits/men/62.jpg",
   },
   {
     id: 5,
-    name: "Anna Kovacs",
-    role: "Music Industry Consultant",
+    name: "Yuki Tanaka",
+    role: "Artist Manager",
     content:
-      "I track opportunities for several artists at once. The deadline tracking and saved lists make that manageable instead of a second full-time job.",
+      "I manage opportunities for five artists at once. The deadline tracking and saved lists make that manageable instead of a second full-time job.",
     avatar: "https://randomuser.me/api/portraits/women/33.jpg",
   },
 ];
