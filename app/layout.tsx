@@ -13,17 +13,17 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://uberfestival.com"),
   title: "UberFestival — Festival opportunities for music professionals",
-  description: "Discover open calls from festivals worldwide and submit your application. Your next career opportunity starts here.",
+  description: "800+ music festival open calls worldwide. Discover opportunities, submit applications, and track deadlines — all in one place.",
   openGraph: {
     title: "UberFestival — Festival opportunities for music professionals",
-    description: "Discover open calls from festivals worldwide. Your next career opportunity starts here.",
+    description: "800+ music festival open calls worldwide. Your next career opportunity starts here.",
     siteName: "UberFestival",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "UberFestival — Festival opportunities for music professionals",
-    description: "Discover open calls from festivals worldwide. Your next career opportunity starts here.",
+    description: "800+ music festival open calls worldwide. Your next career opportunity starts here.",
   },
 };
 

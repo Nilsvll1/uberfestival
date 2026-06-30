@@ -10,7 +10,7 @@ import type { Festival } from "../../lib/types";
 
 export const metadata: Metadata = {
   title: "Explore Festivals | UberFestival",
-  description: "Browse 1,000+ music festival open calls worldwide. Filter by genre, country, and deadline. Find your next performance opportunity.",
+  description: "Browse 800+ music festival open calls worldwide. Filter by genre, country, and deadline. Find your next performance opportunity.",
 };
 
 // Festival list is the same for every visitor — cache it for 1 hour.

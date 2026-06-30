@@ -32,7 +32,7 @@ const getStats = unstable_cache(
 
 export default async function LandingPage() {
   const { applyCount, countries } = await getStats();
-  const applyLabel = applyCount >= 300 ? "300+" : applyCount >= 200 ? "200+" : `${applyCount}+`;
+  const applyLabel = applyCount >= 800 ? "800+" : applyCount >= 500 ? "500+" : applyCount >= 300 ? "300+" : applyCount >= 200 ? "200+" : `${applyCount}+`;
   const countryLabel = countries >= 60 ? "60+" : countries >= 40 ? "40+" : `${countries}+`;
   return (
     <main
