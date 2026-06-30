@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { unstable_cache } from "next/cache";
 import { cookies } from "next/headers";
@@ -6,6 +7,11 @@ import { supabaseAdmin } from "../../lib/supabase-admin";
 import { DEFAULT_LANGUAGE, LANG_COOKIE, isValidLanguage, getTranslations } from "../../lib/i18n";
 import SearchableFestivals from "../components/SearchableFestivals";
 import type { Festival } from "../../lib/types";
+
+export const metadata: Metadata = {
+  title: "Explore Festivals | UberFestival",
+  description: "Browse 1,000+ music festival open calls worldwide. Filter by genre, country, and deadline. Find your next performance opportunity.",
+};
 
 // Festival list is the same for every visitor — cache it for 1 hour.
 // Invalidated immediately when admin approves/rejects via revalidateTag('festivals').
