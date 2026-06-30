@@ -698,12 +698,12 @@ export default function SearchableFestivals({
             <motion.ul
               key={`mobile-${query}-${country}-${category}-${sort}`}
               className="grid gap-3 sm:grid-cols-2"
-              variants={listVariants}
-              initial="hidden"
-              animate="show"
+              variants={filtered.length <= 60 ? listVariants : undefined}
+              initial={filtered.length <= 60 ? "hidden" : false}
+              animate={filtered.length <= 60 ? "show" : undefined}
             >
               {filtered.map((festival, index) => (
-                <motion.li key={festival.id} variants={itemVariants}>
+                <motion.li key={festival.id} variants={filtered.length <= 60 ? itemVariants : undefined}>
                   <FestivalCard
                     festival={festival}
                     index={index}
