@@ -5,4 +5,4 @@ Disallow: /api/
 Disallow: /checkout/
 
 # Sitemap
-Sitemap: https://uberfestival.vercel.app/sitemap.xml
+Sitemap: https://uberfestival.com/sitemap.xml
