@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../lib/supabase-server";
 import ProfileForm from "../../components/ProfileForm";
+import ManageSubscriptionButton from "../../components/ManageSubscriptionButton";
 import { cookies } from "next/headers";
 import { DEFAULT_LANGUAGE, LANG_COOKIE, isValidLanguage } from "../../../lib/i18n";
 
@@ -76,30 +77,68 @@ export default async function ProfilePage() {
         >
           {lang === "fr" ? "Compte" : "Account"}
         </p>
-        <div className="flex items-center gap-3">
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center font-semibold shrink-0"
-            style={{
-              fontSize: "11px",
-              background: "linear-gradient(145deg, #818CF8 0%, #6366F1 55%, #5254E8 100%)",
-              color: "#fff",
-            }}
-          >
-            {user.email?.slice(0, 2).toUpperCase()}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center font-semibold shrink-0"
+              style={{
+                fontSize: "11px",
+                background: "linear-gradient(145deg, #818CF8 0%, #6366F1 55%, #5254E8 100%)",
+                color: "#fff",
+              }}
+            >
+              {user.email?.slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <p style={{ fontSize: "13.5px", fontWeight: 500, color: "var(--text-primary)" }}>
+                {user.email}
+              </p>
+              <p style={{ fontSize: "11.5px", color: "var(--text-muted)" }}>
+                {lang === "fr" ? "Membre depuis " : "Member since "}
+                {new Date(user.created_at).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
+                  year: "numeric",
+                  month: "long",
+                })}
+              </p>
+            </div>
           </div>
-          <div>
-            <p style={{ fontSize: "13.5px", fontWeight: 500, color: "var(--text-primary)" }}>
-              {user.email}
-            </p>
-            <p style={{ fontSize: "11.5px", color: "var(--text-muted)" }}>
-              {lang === "fr" ? "Membre depuis " : "Member since "}
-              {new Date(user.created_at).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
-                year: "numeric",
-                month: "long",
-              })}
-            </p>
-          </div>
+          {profile?.is_premium && profile.stripe_customer_id && (
+            <ManageSubscriptionButton lang={lang} />
+          )}
         </div>
+        {profile?.is_premium && (
+          <div
+            className="flex items-center gap-2 rounded-[10px] px-3 py-2"
+            style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)" }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="#6366F1">
+              <path d="M12 1l2.5 5 5.5.8-4 3.9.9 5.5L12 14l-4.9 2.6.9-5.5L4 7.8 9.5 7z"/>
+            </svg>
+            <span style={{ fontSize: "12.5px", fontWeight: 600, color: "#6366F1" }}>
+              {lang === "fr" ? "Premium actif" : "Premium active"}
+            </span>
+            {profile.premium_until && (
+              <span style={{ fontSize: "11.5px", color: "var(--text-muted)" }}>
+                · {lang === "fr" ? "Valable jusqu'au" : "until"}{" "}
+                {new Date(profile.premium_until).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
+                  day: "numeric", month: "long", year: "numeric",
+                })}
+              </span>
+            )}
+          </div>
+        )}
+        {!profile?.is_premium && (
+          <a
+            href="/#pricing"
+            className="flex items-center gap-2 font-semibold transition-opacity hover:opacity-90"
+            style={{ fontSize: "13px", color: "#6366F1", textDecoration: "none" }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 1l2.5 5 5.5.8-4 3.9.9 5.5L12 14l-4.9 2.6.9-5.5L4 7.8 9.5 7z"/>
+            </svg>
+            {lang === "fr" ? "Passer à Premium — 27 $/an →" : "Upgrade to Premium — $27/year →"}
+          </a>
+        )}
       </div>
     </main>
   );
