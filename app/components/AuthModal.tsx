@@ -7,7 +7,7 @@ import { createClient } from "../../lib/supabase-browser";
 import { syncLocalSaves } from "../actions/auth";
 import { useI18n } from "../hooks/useI18n";
 
-type View = "sign_in" | "sign_up";
+type View = "sign_in" | "sign_up" | "forgot" | "forgot_sent";
 
 const STORAGE_KEY = "uberfestival_saved";
 
@@ -175,6 +175,7 @@ function AuthForm({
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -232,6 +233,18 @@ function AuthForm({
     setLoading(false);
   }
 
+  async function handleForgot(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setForgotLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
+    });
+    setForgotLoading(false);
+    if (error) { setError(error.message); return; }
+    setView("forgot_sent");
+  }
+
   async function handleGoogle() {
     setError(null);
     setGoogleLoading(true);
@@ -245,6 +258,100 @@ function AuthForm({
       setError(error.message);
       setGoogleLoading(false);
     }
+  }
+
+  if (view === "forgot" || view === "forgot_sent") {
+    return (
+      <div>
+        <div className="mb-6">
+          <div
+            className="inline-flex items-center justify-center rounded-[12px] mb-4"
+            style={{ width: 44, height: 44, background: "rgba(99,102,241,0.10)", border: "1px solid rgba(99,102,241,0.2)" }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="2" y="4" width="20" height="16" rx="2"/>
+              <path d="M2 7l10 7 10-7"/>
+            </svg>
+          </div>
+          <h1 id="auth-dialog-title" className="font-extrabold" style={{ fontSize: "22px", letterSpacing: "-0.035em", color: "var(--text-primary)", lineHeight: 1.2 }}>
+            {view === "forgot_sent"
+              ? (lang === "fr" ? "Vérifie ta messagerie" : "Check your inbox")
+              : (lang === "fr" ? "Mot de passe oublié" : "Reset your password")}
+          </h1>
+          <p style={{ fontSize: "13.5px", color: "var(--text-secondary)", marginTop: 6, lineHeight: 1.55 }}>
+            {view === "forgot_sent"
+              ? (lang === "fr"
+                  ? `Un lien de réinitialisation a été envoyé à ${email}.`
+                  : `A reset link was sent to ${email}.`)
+              : (lang === "fr"
+                  ? "Saisis ton adresse e-mail pour recevoir un lien de réinitialisation."
+                  : "Enter your email and we'll send you a reset link.")}
+          </p>
+        </div>
+
+        {view === "forgot_sent" ? (
+          <div
+            className="rounded-[12px] p-4 mb-5 flex items-start gap-3"
+            style={{ background: "rgba(22,163,74,0.07)", border: "1px solid rgba(22,163,74,0.20)" }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#16A34A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
+              <path d="M3 8l3.5 3.5L13 4"/>
+            </svg>
+            <p style={{ fontSize: "13px", color: "#15803D" }}>
+              {lang === "fr" ? "Consulte tes spams si tu ne le trouves pas." : "Check your spam folder if it doesn't arrive within a minute."}
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={handleForgot} className="flex flex-col gap-4">
+            <Field
+              label="Email"
+              id="auth-forgot-email"
+              type="email"
+              value={email}
+              onChange={setEmail}
+              placeholder="you@example.com"
+              autoComplete="email"
+              required
+              autoFocus
+            />
+            {error && (
+              <p className="rounded-[9px] px-3 py-2.5 text-[12.5px]"
+                style={{ background: "rgba(220,38,38,0.07)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.15)" }}>
+                {error}
+              </p>
+            )}
+            <button
+              type="submit"
+              disabled={forgotLoading}
+              className="w-full font-semibold rounded-[11px] flex items-center justify-center"
+              style={{
+                fontSize: "14.5px", padding: "13px 16px",
+                background: forgotLoading ? "rgba(99,102,241,0.6)" : "linear-gradient(135deg, #6366F1 0%, #5254E8 100%)",
+                color: "#fff",
+                boxShadow: forgotLoading ? "none" : "0 4px 18px rgba(99,102,241,0.4), 0 1px 3px rgba(99,102,241,0.2)",
+                cursor: forgotLoading ? "not-allowed" : "pointer",
+                letterSpacing: "-0.01em",
+              }}
+            >
+              {forgotLoading
+                ? (lang === "fr" ? "Envoi…" : "Sending…")
+                : (lang === "fr" ? "Envoyer le lien" : "Send reset link")}
+            </button>
+          </form>
+        )}
+
+        <p className="mt-5 text-center" style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
+          <button
+            type="button"
+            onClick={() => { setView("sign_in"); setError(null); }}
+            style={{ color: "var(--accent)", fontWeight: 600 }}
+            className="hover:opacity-75 transition-opacity"
+          >
+            {lang === "fr" ? "← Retour à la connexion" : "← Back to sign in"}
+          </button>
+        </p>
+      </div>
+    );
   }
 
   if (success) {
@@ -353,6 +460,19 @@ function AuthForm({
           autoComplete={isSignIn ? "current-password" : "new-password"}
           required
         />
+
+        {isSignIn && (
+          <div className="flex justify-end -mt-1">
+            <button
+              type="button"
+              onClick={() => { setView("forgot"); setError(null); }}
+              className="hover:opacity-70 transition-opacity"
+              style={{ fontSize: "12px", color: "var(--text-muted)" }}
+            >
+              {lang === "fr" ? "Mot de passe oublié ?" : "Forgot password?"}
+            </button>
+          </div>
+        )}
 
         {error && (
           <p

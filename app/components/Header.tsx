@@ -14,9 +14,20 @@ export default async function Header({ lang }: { lang: Language }) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Fetch avatar_url alongside the auth check; single lightweight query.
+  let avatarUrl: string | null = null;
+  if (user) {
+    const { data: pd } = await supabase
+      .from("profiles")
+      .select("avatar_url")
+      .eq("id", user.id)
+      .single();
+    avatarUrl = pd?.avatar_url ?? null;
+  }
+
   return (
     <MotionHeader
-      className="sticky top-0 z-50 h-[52px] border-b"
+      className="sticky top-0 z-[900] h-[52px] border-b"
       style={{
         background: "rgba(250,250,251,0.82)",
         backdropFilter: "blur(16px) saturate(180%)",
@@ -62,7 +73,7 @@ export default async function Header({ lang }: { lang: Language }) {
           )}
 
           <LanguageSwitcher />
-          <UserMenu user={user} />
+          <UserMenu user={user} avatarUrl={avatarUrl} />
         </nav>
       </div>
     </MotionHeader>

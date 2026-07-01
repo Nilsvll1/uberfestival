@@ -333,6 +333,33 @@ try {
     }
   }
 
+  // ════════════════════════════════════════════════════════════════
+  // PHASE F — NOTIFICATIONS
+  // ════════════════════════════════════════════════════════════════
+  if (!DRY_RUN) {
+    const siteUrl    = process.env.NEXT_PUBLIC_SITE_URL;
+    const cronSecret = process.env.CRON_SECRET;
+    if (siteUrl && cronSecret) {
+      console.log(`\n── Triggering reopening-alert notifications`);
+      try {
+        const res = await fetch(`${siteUrl}/api/cron/reopening-alerts`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${cronSecret}` },
+        });
+        const body = await res.json().catch(() => ({}));
+        reporter.log(runId, "info", "phase_f", `Notification job: ${JSON.stringify(body)}`);
+        if (body.sent !== undefined) {
+          console.log(`   Sent: ${body.sent}  Skipped: ${body.skipped}  Errors: ${body.errors}`);
+        }
+      } catch (err) {
+        reporter.log(runId, "warn", "phase_f", `Notification trigger failed: ${err.message}`);
+        console.warn(`   [warn] Could not reach ${siteUrl}/api/cron/reopening-alerts`);
+      }
+    } else {
+      console.log(`\n── Phase F skipped (NEXT_PUBLIC_SITE_URL or CRON_SECRET not set in .env)`);
+    }
+  }
+
   // ── Complete run ──────────────────────────────────────────────────────────
   stats.durationMs = Date.now() - startedAt;
 
@@ -349,6 +376,7 @@ try {
   if (!SKIP_LINKS) {
     console.log(`  Links checked: ${stats.linksChecked ?? 0}  Broken: ${stats.linksBroken ?? 0}  Recovered: ${stats.linksRecovered ?? 0}`);
   }
+  console.log(`  Notifications: Phase F ran${DRY_RUN ? " (skipped — dry run)" : ""}`);
   console.log(`${"═".repeat(64)}\n`);
 
   process.exit(0);

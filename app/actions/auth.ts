@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "../../lib/supabase-server";
-import type { Profile } from "../../lib/types";
+import { supabaseAdmin } from "../../lib/supabase-admin";
+import type { NotificationPrefs, Profile } from "../../lib/types";
 
 /* ── Sign out ────────────────────────────────────────────────── */
 export async function signOut() {
@@ -114,6 +115,126 @@ export async function updateProfile(
 
   if (error) return { error: error.message };
 
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/profile");
+  return {};
+}
+
+/* ── Update password (recovery flow) ────────────────────────── */
+export async function updatePassword(
+  password: string
+): Promise<{ error?: string }> {
+  if (!password || password.length < 8)
+    return { error: "Password must be at least 8 characters" };
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) return { error: error.message };
+  return {};
+}
+
+/* ── Delete account (requires admin key, server-only) ────────── */
+export async function deleteAccount(): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  // Deletes from auth.users; FK cascade removes profiles + saved_festivals + festival_views.
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(user.id);
+  if (error) return { error: error.message };
+
+  await supabase.auth.signOut();
+  revalidatePath("/", "layout");
+  redirect("/");
+}
+
+/* ── Export user data (GDPR) ─────────────────────────────────── */
+export async function exportUserData(): Promise<{ data?: string; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const [profileRes, savedRes, viewsRes] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(
+        "artist_name, country, primary_genre, instagram_url, spotify_url, website_url, notification_prefs, is_premium, created_at, updated_at"
+      )
+      .eq("id", user.id)
+      .single(),
+    supabase.from("saved_festivals").select("festival_id, saved_at").eq("user_id", user.id),
+    supabase.from("festival_views").select("festival_id, viewed_at").eq("user_id", user.id),
+  ]);
+
+  const payload = {
+    account: {
+      id: user.id,
+      email: user.email,
+      created_at: user.created_at,
+      last_sign_in_at: user.last_sign_in_at,
+    },
+    profile: profileRes.data ?? null,
+    saved_festivals: savedRes.data ?? [],
+    recently_viewed: viewsRes.data ?? [],
+    exported_at: new Date().toISOString(),
+  };
+
+  return { data: JSON.stringify(payload, null, 2) };
+}
+
+/* ── Update notification preferences ────────────────────────── */
+export async function updateNotificationPrefs(
+  prefs: NotificationPrefs
+): Promise<{ error?: string }> {
+  if (
+    typeof prefs.email_deadlines !== "boolean" ||
+    typeof prefs.email_new_opportunities !== "boolean" ||
+    typeof prefs.email_product_updates !== "boolean"
+  )
+    return { error: "Invalid preferences" };
+  if (
+    "email_reopening_alerts" in prefs &&
+    typeof prefs.email_reopening_alerts !== "boolean"
+  )
+    return { error: "Invalid preferences" };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ notification_prefs: prefs, updated_at: new Date().toISOString() })
+    .eq("id", user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard/privacy");
+  return {};
+}
+
+/* ── Update avatar URL ───────────────────────────────────────── */
+export async function updateAvatarUrl(url: string): Promise<{ error?: string }> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  if (!url.startsWith(`${supabaseUrl}/storage/`))
+    return { error: "Invalid avatar URL" };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ avatar_url: url, updated_at: new Date().toISOString() })
+    .eq("id", user.id);
+
+  if (error) return { error: error.message };
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
   return {};

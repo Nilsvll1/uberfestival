@@ -64,7 +64,7 @@ export default async function ProfilePage() {
         </p>
       </div>
 
-      <ProfileForm profile={profile ?? {}} />
+      <ProfileForm profile={profile ?? {}} userId={user.id} />
 
       {/* Account info */}
       <div
@@ -139,6 +139,20 @@ export default async function ProfilePage() {
             {lang === "fr" ? "Passer à Premium — 27 $/an →" : "Upgrade to Premium — $27/year →"}
           </a>
         )}
+      </div>
+
+      {/* Privacy & data link */}
+      <div className="mt-4 flex justify-end">
+        <a
+          href="/dashboard/privacy"
+          className="flex items-center gap-1.5 transition-opacity hover:opacity-70"
+          style={{ fontSize: "12.5px", color: "var(--text-muted)", textDecoration: "none" }}
+        >
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M7 1.5L2 4v3.5C2 10.5 4.2 12.9 7 13.5c2.8-.6 5-3 5-6V4L7 1.5z"/>
+          </svg>
+          {lang === "fr" ? "Confidentialité et données →" : "Privacy & data →"}
+        </a>
       </div>
     </main>
   );

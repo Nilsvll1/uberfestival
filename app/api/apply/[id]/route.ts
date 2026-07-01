@@ -68,5 +68,11 @@ export async function GET(
     return NextResponse.redirect(`${origin}/festival/${id}`);
   }
 
+  // Log the click for recommendation signals (fire-and-forget, never blocks redirect).
+  supabaseAdmin.from("application_history").upsert(
+    { user_id: user.id, festival_id: Number(id), applied_at: new Date().toISOString() },
+    { onConflict: "user_id,festival_id" }
+  ).then(() => {});
+
   return NextResponse.redirect(applyUrl.href);
 }

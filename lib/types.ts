@@ -58,6 +58,13 @@ export type ScrapeSource = {
   created_at: string;
 };
 
+export type NotificationPrefs = {
+  email_deadlines: boolean;
+  email_new_opportunities: boolean;
+  email_product_updates: boolean;
+  email_reopening_alerts?: boolean;
+};
+
 export type Profile = {
   id: string;
   artist_name: string | null;
@@ -66,6 +73,8 @@ export type Profile = {
   instagram_url: string | null;
   spotify_url: string | null;
   website_url: string | null;
+  avatar_url?: string | null;
+  notification_prefs?: NotificationPrefs | null;
   created_at: string;
   updated_at: string;
   stripe_customer_id?: string | null;
@@ -87,6 +96,24 @@ export type FestivalView = {
   user_id: string;
   festival_id: number;
   viewed_at: string;
+};
+
+export type Collection = {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string | null;
+  slug: string;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CollectionItem = {
+  id: string;
+  collection_id: string;
+  festival_id: number;
+  added_at: string;
 };
 
 export type RssFeed = {

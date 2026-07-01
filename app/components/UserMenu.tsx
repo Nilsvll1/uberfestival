@@ -9,7 +9,7 @@ import { signOut } from "../actions/auth";
 import AuthModal from "./AuthModal";
 import { useI18n } from "../hooks/useI18n";
 
-export default function UserMenu({ user }: { user: User | null }) {
+export default function UserMenu({ user, avatarUrl = null }: { user: User | null; avatarUrl?: string | null }) {
   const { lang } = useI18n();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -57,6 +57,15 @@ export default function UserMenu({ user }: { user: User | null }) {
         aria-label="User menu"
         aria-expanded={open}
       >
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt=""
+            aria-hidden="true"
+            className="w-7 h-7 rounded-full object-cover"
+            style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }}
+          />
+        ) : (
         <span
           className="w-7 h-7 rounded-full flex items-center justify-center font-semibold select-none"
           style={{
@@ -68,6 +77,7 @@ export default function UserMenu({ user }: { user: User | null }) {
         >
           {initials}
         </span>
+        )}
         <svg
           width="10"
           height="10"
@@ -153,6 +163,29 @@ export default function UserMenu({ user }: { user: User | null }) {
                 </svg>
               }
               label={lang === "fr" ? "Profil" : "Profile"}
+              onClick={() => setOpen(false)}
+            />
+            <MenuItem
+              href="/dashboard/collections"
+              icon={
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="1" y="1" width="5.5" height="5.5" rx="1.5"/>
+                  <rect x="7.5" y="1" width="5.5" height="5.5" rx="1.5"/>
+                  <rect x="1" y="7.5" width="5.5" height="5.5" rx="1.5"/>
+                  <rect x="7.5" y="7.5" width="5.5" height="5.5" rx="1.5"/>
+                </svg>
+              }
+              label={lang === "fr" ? "Collections" : "Collections"}
+              onClick={() => setOpen(false)}
+            />
+            <MenuItem
+              href="/dashboard/privacy"
+              icon={
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M7 1.5L2 4v3.5C2 10.5 4.2 12.9 7 13.5c2.8-.6 5-3 5-6V4L7 1.5z"/>
+                </svg>
+              }
+              label={lang === "fr" ? "Confidentialité" : "Privacy & data"}
               onClick={() => setOpen(false)}
             />
 

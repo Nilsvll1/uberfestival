@@ -1,17 +1,20 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { createClient } from "../../../lib/supabase-server";
+import { supabaseAdmin } from "../../../lib/supabase-admin";
 import FestivalMapWrapper from "../../components/FestivalMapWrapper";
-import FestivalCard from "../../components/FestivalCard";
+import SimilarFestivals from "../../components/SimilarFestivals";
+import PeopleAlsoSaved from "../../components/PeopleAlsoSaved";
 import DetailHero from "../../components/DetailHero";
 import ScrollReveal from "../../components/ScrollReveal";
-import { formatDeadline, genreColor } from "../../../lib/utils";
+import { formatDeadline, genreColor, isApplyNowStatus } from "../../../lib/utils";
 import { getFestivalImage, getMood, getAtmosphericText } from "../../../lib/festivalImage";
 import { getTranslations, isValidLanguage, DEFAULT_LANGUAGE, LANG_COOKIE } from "../../../lib/i18n";
 import type { Festival } from "../../../lib/types";
-import { ApplicationStatusBadge, isApplyNowStatus } from "../../components/ApplicationStatusBadge";
+import { ApplicationStatusBadge } from "../../components/ApplicationStatusBadge";
 
 export async function generateMetadata({
   params,
@@ -19,8 +22,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data } = await supabase
+  const { data } = await supabaseAdmin
     .from("festivals")
     .select("festival_name, city, country, category")
     .eq("id", id)
@@ -58,13 +60,14 @@ export default async function FestivalPage({
   const lang = isValidLanguage(rawLang) ? rawLang : DEFAULT_LANGUAGE;
   const t = getTranslations(lang);
 
+  // Auth client for user-specific queries; admin client for public festival data.
   const supabase = await createClient();
 
   const [
     { data: festival, error },
     { data: { user } },
   ] = await Promise.all([
-    supabase.from("festivals").select("*").eq("id", id).single(),
+    supabaseAdmin.from("festivals").select("*").eq("id", id).single(),
     supabase.auth.getUser(),
   ]);
 
@@ -78,13 +81,7 @@ export default async function FestivalPage({
     ).then(() => {});
   }
 
-  const [relatedResult, savedResult, profileResult] = await Promise.all([
-    supabase
-      .from("festivals")
-      .select("id, festival_name, city, country, category, application_url, application_status, submission_deadline, latitude, longitude, website, hero_image_url")
-      .eq("category", festival.category ?? "")
-      .neq("id", Number(id))
-      .limit(3),
+  const [savedResult, profileResult] = await Promise.all([
     user
       ? supabase
           .from("saved_festivals")
@@ -96,14 +93,6 @@ export default async function FestivalPage({
       ? supabase.from("profiles").select("is_premium").eq("id", user.id).single()
       : Promise.resolve({ data: null }),
   ]);
-
-  // Strip application_url from related festivals before they enter the RSC payload
-  // via FestivalCard (a client component). Replace with a boolean so the card
-  // can show the Premium gate or the /api/apply/[id] redirect appropriately.
-  const related = (relatedResult.data ?? []).map((f) => {
-    const { application_url, ...rest } = f as Festival;
-    return { ...rest, has_apply_url: !!application_url };
-  });
 
   const savedIds = (savedResult.data ?? []).map((s: { festival_id: number }) => s.festival_id);
   const isPremium: boolean | null = user ? (profileResult.data?.is_premium ?? false) : null;
@@ -223,9 +212,10 @@ export default async function FestivalPage({
               fontSize: "clamp(2rem, 5.5vw, 3.8rem)",
               letterSpacing: "-0.035em",
               color: "#fff",
+              overflowWrap: "break-word",
             }}
           >
-            {festival.festival_name}
+            {festival.festival_name ?? "Festival"}
           </h1>
 
           {/* Deadline + CTA */}
@@ -565,49 +555,31 @@ export default async function FestivalPage({
         </div>
         </ScrollReveal>
 
-        {/* ── Related ────────────────────────────────────────── */}
+        {/* ── Similar + People also saved ────────────────────── */}
         <ScrollReveal delay={0.05}>
-        {related && related.length > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <p
-                  className="uppercase font-semibold tracking-[0.1em] mb-1"
-                  style={{ fontSize: "10px", color: "var(--text-muted)" }}
-                >
-                  {t.festival.discover}
-                </p>
-                <h2
-                  className="font-semibold"
-                  style={{ fontSize: "18px", letterSpacing: "-0.02em", color: "var(--text-primary)" }}
-                >
-                  {t.festival.similar}
-                </h2>
-              </div>
-              <Link
-                href="/explore"
-                className="transition-opacity hover:opacity-60"
-                style={{ fontSize: "13px", color: "var(--accent)" }}
-              >
-                {t.festival.viewAll}
-              </Link>
-            </div>
-            <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {(related as Festival[]).map((f, i) => (
-                <li key={f.id}>
-                  <FestivalCard
-                    festival={f}
-                    index={i}
-                    lang={lang}
-                    userId={user?.id ?? null}
-                    initialSaved={savedIds.includes(f.id)}
-                    isPremium={isPremium}
-                  />
-                </li>
-              ))}
-            </ul>
+        <section>
+            <Suspense fallback={null}>
+              <SimilarFestivals
+                festivalId={festival.id}
+                category={festival.category ?? null}
+                country={festival.country ?? null}
+                applicationStatus={festival.application_status ?? null}
+                savedIds={savedIds}
+                isPremium={isPremium}
+                userId={user?.id ?? null}
+                lang={lang}
+              />
+            </Suspense>
+            <Suspense fallback={null}>
+              <PeopleAlsoSaved
+                festivalId={festival.id}
+                savedIds={savedIds}
+                isPremium={isPremium}
+                userId={user?.id ?? null}
+                lang={lang}
+              />
+            </Suspense>
           </section>
-        )}
         </ScrollReveal>
       </div>
     </main>

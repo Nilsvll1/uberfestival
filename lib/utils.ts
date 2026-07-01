@@ -1,6 +1,30 @@
 import type { Language } from "./i18n/types";
 import type { Festival } from "./types";
 
+export type ApplicationStatus =
+  | "verified_application"
+  | "email_submission"
+  | "filmfreeway"
+  | "festhome"
+  | "contact_form"
+  | "contact_submission"
+  | "invitation_only"
+  | "seasonally_closed"
+  | "unknown";
+
+const APPLY_NOW_STATUSES = new Set<ApplicationStatus>([
+  "verified_application",
+  "filmfreeway",
+  "festhome",
+  "email_submission",
+  "contact_form",
+]);
+
+export function isApplyNowStatus(status: string | null | undefined): boolean {
+  if (!status) return false;
+  return APPLY_NOW_STATUSES.has(status as ApplicationStatus);
+}
+
 export type DeadlineStatus = "ok" | "soon" | "urgent" | "expired";
 
 /* ── Urgency grouping ──────────────────────────────────────── */

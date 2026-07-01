@@ -18,7 +18,7 @@ export const en: Translations = {
     search: "Search opportunities…",
     country: "Country",
     genre: "Genre",
-    deadline: "Urgent",
+    deadline: "Deadline",
     az: "A–Z",
     reset: "Reset",
     emptyTitle: "No opportunities found",
@@ -33,19 +33,6 @@ export const en: Translations = {
       if (genre) return [`${n} ${genre}`, `opportunit${n !== 1 ? "ies" : "y"}.`];
       if (country) return [`${n} opportunit${n !== 1 ? "ies" : "y"}`, `in ${country}.`];
       return [`${n} opportunit${n !== 1 ? "ies" : "y"}`, `available.`];
-    },
-    closingSoon: (n) => `${n} closing this week`,
-    urgencyGroups: {
-      thisWeek:   "Closing this week",
-      thisMonth:  "Closing this month",
-      upcoming:   "Coming up",
-      noDeadline: "Open deadline",
-      expired:    "Closed",
-    },
-    urgencyTabs: {
-      all:       "All",
-      thisWeek:  (n) => n > 0 ? `This week · ${n}` : "This week",
-      thisMonth: (n) => n > 0 ? `This month · ${n}` : "This month",
     },
   },
   card: {

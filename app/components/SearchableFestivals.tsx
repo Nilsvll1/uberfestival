@@ -5,8 +5,6 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import type { Festival } from "../../lib/types";
-import type { UrgencyGroup } from "../../lib/utils";
-import { getUrgencyGroup } from "../../lib/utils";
 import FestivalMapWrapper from "./FestivalMapWrapper";
 import FilterDropdown from "./FilterDropdown";
 import FestivalCard from "./FestivalCard";
@@ -15,22 +13,23 @@ import VirtualFestivalList, {
   type VirtualItem,
 } from "./VirtualFestivalList";
 import { useI18n } from "../hooks/useI18n";
+import type { Translations } from "../../lib/i18n";
 import type { MapBounds } from "./FestivalMap";
 
-const listVariants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.04 } },
-};
+// ── Application method filters ────────────────────────────────────────────────
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 8 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] as const } },
-};
+const APPLICATION_METHODS = [
+  { status: "verified_application", label: "Verified" },
+  { status: "filmfreeway",          label: "FilmFreeway" },
+  { status: "festhome",             label: "Festhome" },
+  { status: "email_submission",     label: "Email" },
+  { status: "contact_form",         label: "Form" },
+  { status: "invitation_only",      label: "Invite Only" },
+] as const satisfies ReadonlyArray<{ status: string; label: string }>;
+
+// ── Sorting ───────────────────────────────────────────────────────────────────
 
 type SortKey = "deadline" | "name";
-type UrgencyTab = "all" | "week" | "month";
-
-const URGENCY_ORDER: UrgencyGroup[] = ["this-week", "this-month", "upcoming", "no-deadline", "expired"];
 
 function sortFestivals(festivals: Festival[], sort: SortKey, today: string): Festival[] {
   if (sort === "name")
@@ -48,6 +47,8 @@ function sortFestivals(festivals: Festival[], sort: SortKey, today: string): Fes
   });
 }
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function SearchableFestivals({
   festivals,
   userId = null,
@@ -64,72 +65,57 @@ export default function SearchableFestivals({
   const { lang, t } = useI18n();
   const h = t.home;
 
-  const router      = useRouter();
-  const pathname    = usePathname();
+  const router       = useRouter();
+  const pathname     = usePathname();
   const searchParams = useSearchParams();
 
-  const [query,       setQuery]       = useState(() => searchParams.get("q")       ?? "");
-  const [country,     setCountry]     = useState(() => searchParams.get("country") ?? "");
-  const [category,    setCategory]    = useState(() => searchParams.get("genre")   ?? "");
-  const [sort,        setSort]        = useState<SortKey>("deadline");
-  const [urgencyTab,  setUrgencyTab]  = useState<UrgencyTab>("all");
-  const [hoveredId,        setHoveredId]        = useState<number | null>(null);
-  const [mapBounds,        setMapBounds]        = useState<MapBounds | null>(null);
-  const [showAllInViewport, setShowAllInViewport] = useState(false);
+  const [query,    setQuery]    = useState(() => searchParams.get("q")       ?? "");
+  const [country,  setCountry]  = useState(() => searchParams.get("country") ?? "");
+  const [category, setCategory] = useState(() => searchParams.get("genre")   ?? "");
+  const [sort,     setSort]     = useState<SortKey>("deadline");
+  const [methods,  setMethods]  = useState<Set<string>>(() => new Set());
+  const [hoveredId,         setHoveredId]         = useState<number | null>(null);
+  const [mapBounds,         setMapBounds]          = useState<MapBounds | null>(null);
+  const [showAllInViewport, setShowAllInViewport]  = useState(false);
 
   const searchRef      = useRef<HTMLInputElement>(null);
   const mobileSearch   = useRef<HTMLInputElement>(null);
   const desktopListRef = useRef<VirtualFestivalListHandle>(null);
   const didMount       = useRef(false);
 
-  const countries   = useMemo(() => [...new Set(festivals.map(f => f.country).filter(Boolean))].sort() as string[], [festivals]);
-  const categories  = useMemo(() => [...new Set(festivals.map(f => f.category).filter(Boolean))].sort() as string[], [festivals]);
+  const countries  = useMemo(() => [...new Set(festivals.map(f => f.country).filter(Boolean))].sort() as string[], [festivals]);
+  const categories = useMemo(() => [...new Set(festivals.map(f => f.category).filter(Boolean))].sort() as string[], [festivals]);
   const uniqueCountriesCount = useMemo(() => new Set(festivals.map(f => f.country).filter(Boolean)).size, [festivals]);
 
-  // Base filter (search + dropdowns, no urgency tab)
+  const toggleMethod = useCallback((status: string) => {
+    setMethods(prev => {
+      const next = new Set(prev);
+      if (next.has(status)) next.delete(status); else next.add(status);
+      return next;
+    });
+  }, []);
+
   const baseFiltered = useMemo(() => festivals.filter(f => {
-    const matchName    = query.trim() === "" || f.festival_name.toLowerCase().includes(query.toLowerCase());
-    const matchCountry = country   === "" || f.country   === country;
-    const matchCat     = category  === "" || f.category  === category;
-    return matchName && matchCountry && matchCat;
-  }), [festivals, query, country, category]);
+    const matchName   = query.trim() === "" || f.festival_name.toLowerCase().includes(query.toLowerCase());
+    const matchCountry = country  === "" || f.country  === country;
+    const matchCat    = category  === "" || f.category === category;
+    const matchMethod = methods.size === 0 || methods.has(f.application_status ?? "");
+    return matchName && matchCountry && matchCat && matchMethod;
+  }), [festivals, query, country, category, methods]);
 
-  // Tab counts (reflect base filters so users see relevant counts)
-  const weekCount  = useMemo(() => baseFiltered.filter(f => getUrgencyGroup(f.submission_deadline, today) === "this-week").length, [baseFiltered, today]);
-  const monthCount = useMemo(() => baseFiltered.filter(f => {
-    const g = getUrgencyGroup(f.submission_deadline, today);
-    return g === "this-week" || g === "this-month";
-  }).length, [baseFiltered, today]);
+  const filtered = useMemo(
+    () => sortFestivals(baseFiltered, sort, today),
+    [baseFiltered, sort, today],
+  );
 
-  // Final filtered list — applies urgency tab on top of base
-  const filtered = useMemo(() => {
-    let base = baseFiltered;
-    if (urgencyTab === "week") {
-      base = base.filter(f => getUrgencyGroup(f.submission_deadline, today) === "this-week");
-    } else if (urgencyTab === "month") {
-      base = base.filter(f => {
-        const g = getUrgencyGroup(f.submission_deadline, today);
-        return g === "this-week" || g === "this-month";
-      });
-    }
-    return sortFestivals(base, sort, today);
-  }, [baseFiltered, urgencyTab, sort, today]);
+  const handleBoundsChange = useCallback((bounds: MapBounds) => {
+    setMapBounds(prev => {
+      if (prev && Math.round(prev.zoom) !== Math.round(bounds.zoom)) setShowAllInViewport(false);
+      return bounds;
+    });
+  }, []);
 
-  // Groups for the "all" tab grouped view (only when sort === "deadline")
-  const groups = useMemo(() => {
-    if (urgencyTab !== "all" || sort !== "deadline") return null;
-    const map = new Map<UrgencyGroup, Festival[]>();
-    for (const f of filtered) {
-      const g = getUrgencyGroup(f.submission_deadline, today);
-      if (!map.has(g)) map.set(g, []);
-      map.get(g)!.push(f);
-    }
-    return URGENCY_ORDER.filter(g => map.has(g)).map(g => ({ key: g, items: map.get(g)! }));
-  }, [filtered, urgencyTab, sort, today]);
-
-  // Filter sidebar to festivals currently visible in the map viewport.
-  // The map itself always shows all `filtered` festivals (for clustering).
-  // Antimeridian wrap: when east < west the view crosses the 180° meridian.
+  // Sidebar shows only festivals in the current map viewport.
   const viewportFiltered = useMemo(() => {
     if (!mapBounds) return filtered;
     const { north, south, east, west } = mapBounds;
@@ -142,15 +128,6 @@ export default function SearchableFestivals({
     });
   }, [filtered, mapBounds]);
 
-  // Zoom-based cap: limits sidebar items at wide zoom levels to reduce render work.
-  // Reset "show all" whenever the viewport changes (zoom/pan) — the cap may be different.
-  const handleBoundsChange = useCallback((bounds: MapBounds) => {
-    setMapBounds(prev => {
-      if (prev && Math.round(prev.zoom) !== Math.round(bounds.zoom)) setShowAllInViewport(false);
-      return bounds;
-    });
-  }, []);
-
   const sidebarCap = useMemo((): number | null => {
     const zoom = mapBounds?.zoom ?? 2;
     if (zoom <= 3) return 50;
@@ -161,58 +138,23 @@ export default function SearchableFestivals({
 
   const isCapped = !showAllInViewport && sidebarCap !== null && viewportFiltered.length > sidebarCap;
 
-  // Apply cap: prioritise urgency order (viewportFiltered is already sorted by deadline).
   const displayedFestivals = useMemo(
     () => (isCapped && sidebarCap ? viewportFiltered.slice(0, sidebarCap) : viewportFiltered),
     [viewportFiltered, isCapped, sidebarCap],
   );
 
-  // Groups for viewport-filtered festivals (mirrors `groups` logic but on displayedFestivals).
-  const viewportGroups = useMemo(() => {
-    if (urgencyTab !== "all" || sort !== "deadline") return null;
-    const map = new Map<UrgencyGroup, Festival[]>();
-    for (const f of displayedFestivals) {
-      const g = getUrgencyGroup(f.submission_deadline, today);
-      if (!map.has(g)) map.set(g, []);
-      map.get(g)!.push(f);
-    }
-    return URGENCY_ORDER.filter(g => map.has(g)).map(g => ({ key: g, items: map.get(g)! }));
-  }, [displayedFestivals, urgencyTab, sort, today]);
+  const virtualItems = useMemo<VirtualItem[]>(
+    () => displayedFestivals.map((festival, i) => ({ type: "card", festival, listIndex: i })),
+    [displayedFestivals],
+  );
 
-  // Flat items array for the desktop virtual list (uses viewport-filtered data).
-  const virtualItems = useMemo<VirtualItem[]>(() => {
-    if (viewportGroups) {
-      const items: VirtualItem[] = [];
-      for (const group of viewportGroups) {
-        items.push({
-          type: "header",
-          label: h.urgencyGroups[
-            group.key === "this-week"   ? "thisWeek"  :
-            group.key === "this-month"  ? "thisMonth" :
-            group.key === "upcoming"    ? "upcoming"  :
-            group.key === "no-deadline" ? "noDeadline" :
-            "expired"
-          ],
-          count: group.items.length,
-          isHot: group.key === "this-week",
-        });
-        for (let i = 0; i < group.items.length; i++) {
-          items.push({ type: "card", festival: group.items[i], listIndex: i });
-        }
-      }
-      return items;
-    }
-    return displayedFestivals.map((festival, i) => ({ type: "card", festival, listIndex: i }));
-  }, [viewportGroups, displayedFestivals, h.urgencyGroups]);
-
-
-  const hasFilters = query.trim() !== "" || country !== "" || category !== "" || urgencyTab !== "all";
+  const hasFilters = query.trim() !== "" || country !== "" || category !== "" || methods.size > 0;
 
   const reset = useCallback(() => {
-    setQuery(""); setCountry(""); setCategory(""); setUrgencyTab("all");
+    setQuery(""); setCountry(""); setCategory(""); setMethods(new Set());
   }, []);
 
-  // "/" keyboard shortcut
+  // "/" shortcut
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "/" && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
@@ -224,7 +166,7 @@ export default function SearchableFestivals({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // Sync filter state to URL (skip first render to avoid replacing URL on mount)
+  // Sync search/country/genre to URL
   useEffect(() => {
     if (!didMount.current) { didMount.current = true; return; }
     const params = new URLSearchParams();
@@ -236,7 +178,7 @@ export default function SearchableFestivals({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, country, category]);
 
-  // Scroll the virtual list to show the hovered card (when hover comes from map)
+  // Scroll virtual list to card when hovered from map
   useEffect(() => {
     if (hoveredId === null) return;
     desktopListRef.current?.scrollToFestival(hoveredId);
@@ -244,9 +186,13 @@ export default function SearchableFestivals({
 
   const hasSomeHover = hoveredId !== null;
 
+  const taglineLines = hasFilters
+    ? h.contextTagline(filtered.length, category, country)
+    : h.tagline;
+
   return (
     <>
-      {/* ─── DESKTOP ──────────────────────────────────────────── */}
+      {/* ─── DESKTOP ─────────────────────────────────────────────── */}
       <div className="hidden lg:block relative" style={{ height: "calc(100vh - 52px)" }}>
 
         {/* Full-viewport map */}
@@ -265,88 +211,62 @@ export default function SearchableFestivals({
         <div
           className="absolute top-0 left-0 h-full flex flex-col"
           style={{
-            width: 420,
+            width: 400,
             zIndex: 450,
-            background: "rgba(249,249,251,0.92)",
-            backdropFilter: "blur(16px) saturate(150%)",
-            WebkitBackdropFilter: "blur(16px) saturate(150%)",
+            background: "rgba(249,249,251,0.93)",
+            backdropFilter: "blur(18px) saturate(160%)",
+            WebkitBackdropFilter: "blur(18px) saturate(160%)",
             borderRight: "1px solid rgba(0,0,0,0.07)",
-            boxShadow: "12px 0 48px rgba(0,0,0,0.07)",
+            boxShadow: "12px 0 48px rgba(0,0,0,0.06)",
           }}
         >
-          {/* ── Panel header ─────────────────────────────────── */}
-          <div className="shrink-0 px-6 pt-6 pb-5">
+          {/* ── Panel header ─────────────────────────────────────── */}
+          <div className="shrink-0 px-5 pt-5 pb-4">
 
-            {/* Full logo — hero branding */}
-            <div className="mb-5">
+            <div className="mb-4">
               <Image
                 src="/logo-cropped.png"
                 alt="UberFestival"
-                width={176}
-                height={29}
+                width={160}
+                height={26}
                 priority
                 style={{ objectFit: "contain", objectPosition: "left" }}
               />
             </div>
 
-            {/* Live indicator + urgency alert */}
-            <div className="flex items-center gap-2 mb-4">
+            {/* Live count */}
+            <div className="flex items-center gap-2 mb-3">
               <span className="live-dot" aria-hidden="true" />
               <span
                 className="font-semibold uppercase"
-                style={{ fontSize: "10px", letterSpacing: "0.08em", color: "#059669" }}
+                style={{ fontSize: "9px", letterSpacing: "0.08em", color: "#059669" }}
               >
                 {h.live}
               </span>
-              <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>·</span>
-              <span style={{ fontSize: "10px", color: "var(--text-secondary)", fontWeight: 500 }}>
+              <span style={{ fontSize: "9px", color: "var(--text-muted)" }}>·</span>
+              <span style={{ fontSize: "9px", color: "var(--text-secondary)", fontWeight: 500 }}>
                 {h.openCalls(festivals.length)}
               </span>
-              {weekCount > 0 && (
-                <>
-                  <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>·</span>
-                  <button
-                    onClick={() => setUrgencyTab("week")}
-                    className="flex items-center gap-1 transition-opacity hover:opacity-80"
-                    style={{ fontSize: "10px", color: "#DC2626", fontWeight: 600 }}
-                  >
-                    <span style={{ fontSize: 8 }}>●</span>
-                    {h.closingSoon(weekCount)}
-                  </button>
-                </>
-              )}
             </div>
 
-            {/* Tagline — static or contextual when filters active */}
-            {(() => {
-              const lines = hasFilters
-                ? h.contextTagline(filtered.length, category, country)
-                : h.tagline;
-              return (
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.h1
-                    key={hasFilters ? `ctx-${category}-${country}-${filtered.length}` : "default"}
-                    initial={{ opacity: 0, y: -5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 5 }}
-                    transition={{ duration: 0.18, ease: "easeOut" }}
-                    className="font-extrabold leading-[1.04]"
-                    style={{ fontSize: "28px", letterSpacing: "-0.04em", color: "var(--text-primary)" }}
-                  >
-                    {lines[0]}<br />
-                    <span style={{ color: "var(--accent)" }}>{lines[1]}</span>
-                  </motion.h1>
-                </AnimatePresence>
-              );
-            })()}
-
-            {/* Platform descriptor */}
-            <p style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: 5 }}>
-              {h.platform}
-            </p>
+            {/* Tagline */}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.h1
+                key={hasFilters ? `ctx-${category}-${country}-${filtered.length}` : "default"}
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 5 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                className="font-extrabold leading-[1.04]"
+                style={{ fontSize: "26px", letterSpacing: "-0.04em", color: "var(--text-primary)" }}
+              >
+                {taglineLines[0]}<br />
+                <span style={{ color: "var(--accent)" }}>{taglineLines[1]}</span>
+              </motion.h1>
+            </AnimatePresence>
 
             {/* Stat pills */}
-            <div className="flex items-center gap-2 mt-3.5">
+            <div className="flex items-center gap-2 mt-3">
               <StatPill>
                 <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
                   <circle cx="6" cy="6" r="5"/>
@@ -365,92 +285,15 @@ export default function SearchableFestivals({
                 {h.genres(categories.length)}
               </StatPill>
             </div>
-
-            {/* Result count: "Showing 50 of 1,106" or "X in view" or plain filter count */}
-            {(hasFilters || hasSomeHover || (mapBounds && viewportFiltered.length < filtered.length) || isCapped) && (
-              <p className="mt-3 flex items-center gap-2 flex-wrap" style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                <span>
-                  {isCapped ? (
-                    <>
-                      {"Showing "}
-                      <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                        {displayedFestivals.length.toLocaleString()}
-                      </span>
-                      {" of "}
-                      <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                        {viewportFiltered.length.toLocaleString()}
-                      </span>
-                      {viewportFiltered.length < filtered.length ? ` ${t.festival.inView}` : " festivals"}
-                    </>
-                  ) : (
-                    <>
-                      <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                        {viewportFiltered.length < filtered.length ? viewportFiltered.length : filtered.length}
-                      </span>
-                      {" "}
-                      {viewportFiltered.length < filtered.length
-                        ? t.festival.inView
-                        : h.opportunities(filtered.length)}
-                    </>
-                  )}
-                </span>
-                {hasFilters && (
-                  <>
-                    <span style={{ color: "var(--border-strong)" }}>·</span>
-                    <button
-                      onClick={reset}
-                      className="hover:opacity-70 transition-opacity"
-                      style={{ color: "var(--accent)", fontSize: "12px" }}
-                    >
-                      {h.reset}
-                    </button>
-                  </>
-                )}
-              </p>
-            )}
           </div>
 
-          {/* ── Filter controls ───────────────────────────────── */}
+          {/* ── Filter section ────────────────────────────────────── */}
           <div
-            className="shrink-0 px-5 pb-4"
+            className="shrink-0 px-4 pb-4"
             style={{ borderBottom: "1px solid rgba(0,0,0,0.06)" }}
           >
-            {/* Urgency tabs */}
-            <div
-              className="flex items-center gap-0.5 p-1 rounded-xl mb-3"
-              style={{ background: "rgba(0,0,0,0.04)" }}
-            >
-              {(["all", "week", "month"] as UrgencyTab[]).map(tab => {
-                const label =
-                  tab === "all"   ? h.urgencyTabs.all :
-                  tab === "week"  ? h.urgencyTabs.thisWeek(weekCount) :
-                  h.urgencyTabs.thisMonth(monthCount);
-                const isHot = tab === "week" && weekCount > 0;
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => setUrgencyTab(tab)}
-                    className="flex-1 text-center rounded-lg transition-all"
-                    style={{
-                      fontSize: "11.5px",
-                      padding: "5px 6px",
-                      fontWeight: urgencyTab === tab ? 600 : 400,
-                      background: urgencyTab === tab ? "#fff" : "transparent",
-                      color: urgencyTab === tab
-                        ? (isHot ? "#DC2626" : "var(--text-primary)")
-                        : "var(--text-muted)",
-                      boxShadow: urgencyTab === tab ? "0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04)" : "none",
-                      transition: "background 150ms, color 150ms, box-shadow 150ms",
-                    }}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-
             {/* Search */}
-            <div className="relative">
+            <div className="relative mb-3">
               <svg
                 className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
                 style={{ color: "var(--text-muted)", width: 13, height: 13 }}
@@ -489,12 +332,99 @@ export default function SearchableFestivals({
               )}
             </div>
 
-            {/* Chips + sort */}
-            <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
+            {/* Dropdowns */}
+            <div className="flex items-center gap-2 mb-4">
               <FilterDropdown label={h.country}  value={country}  options={countries}  onChange={setCountry}  showAllLabel={h.showAll} />
               <FilterDropdown label={h.genre}    value={category} options={categories} onChange={setCategory} showAllLabel={h.showAll} />
+            </div>
+
+            {/* Application method chips */}
+            <div className="mb-4">
+              <p
+                className="uppercase font-semibold mb-2"
+                style={{ fontSize: "9px", letterSpacing: "0.08em", color: "var(--text-muted)" }}
+              >
+                Apply via
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {APPLICATION_METHODS.map(m => {
+                  const selected = methods.has(m.status);
+                  const isVerified = m.status === "verified_application";
+                  return (
+                    <button
+                      key={m.status}
+                      onClick={() => toggleMethod(m.status)}
+                      style={{
+                        fontSize: "11px",
+                        padding: "3px 9px",
+                        borderRadius: 6,
+                        fontWeight: selected ? 600 : 400,
+                        cursor: "pointer",
+                        transition: "all 120ms",
+                        background: selected
+                          ? isVerified
+                            ? "rgba(22,163,74,0.10)"
+                            : "rgba(99,102,241,0.10)"
+                          : "rgba(0,0,0,0.04)",
+                        color: selected
+                          ? isVerified ? "#15803D" : "#6366F1"
+                          : "var(--text-secondary)",
+                        border: selected
+                          ? isVerified
+                            ? "1px solid rgba(22,163,74,0.25)"
+                            : "1px solid rgba(99,102,241,0.25)"
+                          : "1px solid rgba(0,0,0,0.07)",
+                      }}
+                    >
+                      {selected && isVerified ? "✓ " : ""}{m.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Result count + sort */}
+            <div className="flex items-center justify-between gap-3">
+              <p style={{ fontSize: "11.5px", color: "var(--text-secondary)" }}>
+                {isCapped ? (
+                  <>
+                    <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                      {displayedFestivals.length.toLocaleString()}
+                    </span>
+                    {" of "}
+                    <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                      {viewportFiltered.length.toLocaleString()}
+                    </span>
+                    {viewportFiltered.length < filtered.length ? ` ${t.festival.inView}` : ""}
+                  </>
+                ) : (
+                  <>
+                    <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                      {viewportFiltered.length < filtered.length ? viewportFiltered.length : filtered.length}
+                    </span>
+                    {" "}
+                    {viewportFiltered.length < filtered.length
+                      ? t.festival.inView
+                      : h.opportunities(filtered.length)}
+                  </>
+                )}
+                {hasFilters && (
+                  <>
+                    {" · "}
+                    <button
+                      onClick={reset}
+                      className="hover:opacity-70 transition-opacity"
+                      style={{ color: "var(--accent)" }}
+                    >
+                      {h.reset}
+                    </button>
+                  </>
+                )}
+              </p>
+
+              {/* Sort toggle */}
               <div
-                className="flex items-center rounded-full border overflow-hidden ml-auto"
+                className="flex items-center rounded-full border overflow-hidden shrink-0"
                 style={{ borderColor: "var(--border)", boxShadow: "var(--shadow-xs)" }}
               >
                 {(["deadline", "name"] as SortKey[]).map(key => (
@@ -503,7 +433,7 @@ export default function SearchableFestivals({
                     onClick={() => setSort(key)}
                     className="transition-colors"
                     style={{
-                      fontSize: "12px", padding: "4px 10px",
+                      fontSize: "11.5px", padding: "4px 10px",
                       background: sort === key ? "var(--text-primary)" : "rgba(255,255,255,0.8)",
                       color:      sort === key ? "#fff" : "var(--text-muted)",
                       fontWeight: sort === key ? 500 : 400,
@@ -516,7 +446,7 @@ export default function SearchableFestivals({
             </div>
           </div>
 
-          {/* ── Scrollable list (virtualized) ─────────────────── */}
+          {/* ── Scrollable list (virtualized) ────────────────────── */}
           <div className="flex flex-col flex-1 min-h-0">
             <div className="relative flex-1 min-h-0">
               {filtered.length === 0 ? (
@@ -556,7 +486,7 @@ export default function SearchableFestivals({
               />
             </div>
 
-            {/* Show-all footer — only visible when a zoom cap is in effect */}
+            {/* Show-all footer */}
             {isCapped && (
               <button
                 onClick={() => setShowAllInViewport(true)}
@@ -573,14 +503,14 @@ export default function SearchableFestivals({
                 <span style={{ color: "var(--accent)", fontWeight: 600 }}>
                   Show all {viewportFiltered.length.toLocaleString()}
                 </span>
-                {" "}· {viewportFiltered.length < filtered.length ? "in view" : "festivals"}
+                {" · "}{viewportFiltered.length < filtered.length ? "in view" : "festivals"}
               </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* ─── MOBILE ───────────────────────────────────────────── */}
+      {/* ─── MOBILE ────────────────────────────────────────────────── */}
       <div className="lg:hidden flex flex-col">
         {/* Map */}
         <div style={{ height: "45vh", flexShrink: 0 }}>
@@ -604,7 +534,8 @@ export default function SearchableFestivals({
             borderBottom: "1px solid var(--border)",
           }}
         >
-          <div className="relative">
+          {/* Search */}
+          <div className="relative mb-2">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
               style={{ color: "var(--text-muted)", width: 13, height: 13 }}
               fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -625,39 +556,47 @@ export default function SearchableFestivals({
               }}
             />
           </div>
-          {/* Urgency tabs — mobile */}
+
+          {/* Method chips — horizontal scroll */}
           <div
-            className="flex items-center gap-0.5 p-1 rounded-xl mt-2"
-            style={{ background: "rgba(0,0,0,0.04)" }}
+            className="flex gap-1.5 mt-1 mb-2"
+            style={{ overflowX: "auto", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
           >
-            {(["all", "week", "month"] as UrgencyTab[]).map(tab => {
-              const label =
-                tab === "all"   ? h.urgencyTabs.all :
-                tab === "week"  ? h.urgencyTabs.thisWeek(weekCount) :
-                h.urgencyTabs.thisMonth(monthCount);
+            {APPLICATION_METHODS.map(m => {
+              const selected = methods.has(m.status);
+              const isVerified = m.status === "verified_application";
               return (
                 <button
-                  key={tab}
-                  onClick={() => setUrgencyTab(tab)}
-                  className="flex-1 text-center rounded-lg transition-all"
+                  key={m.status}
+                  onClick={() => toggleMethod(m.status)}
                   style={{
-                    fontSize: "11.5px",
-                    padding: "5px 6px",
-                    fontWeight: urgencyTab === tab ? 600 : 400,
-                    background: urgencyTab === tab ? "#fff" : "transparent",
-                    color: urgencyTab === tab
-                      ? (tab === "week" && weekCount > 0 ? "#DC2626" : "var(--text-primary)")
-                      : "var(--text-muted)",
-                    boxShadow: urgencyTab === tab ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                    fontSize: "11px",
+                    padding: "3px 9px",
+                    borderRadius: 6,
+                    flexShrink: 0,
+                    fontWeight: selected ? 600 : 400,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    transition: "all 120ms",
+                    background: selected
+                      ? isVerified ? "rgba(22,163,74,0.10)" : "rgba(99,102,241,0.10)"
+                      : "rgba(0,0,0,0.04)",
+                    color: selected
+                      ? isVerified ? "#15803D" : "#6366F1"
+                      : "var(--text-secondary)",
+                    border: selected
+                      ? isVerified ? "1px solid rgba(22,163,74,0.25)" : "1px solid rgba(99,102,241,0.25)"
+                      : "1px solid rgba(0,0,0,0.07)",
                   }}
                 >
-                  {label}
+                  {selected && isVerified ? "✓ " : ""}{m.label}
                 </button>
               );
             })}
           </div>
 
-          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+          {/* Dropdowns + sort */}
+          <div className="flex items-center gap-1.5 flex-wrap">
             <FilterDropdown label={h.country}  value={country}  options={countries}  onChange={setCountry}  showAllLabel={h.showAll} />
             <FilterDropdown label={h.genre}    value={category} options={categories} onChange={setCategory} showAllLabel={h.showAll} />
             <div
@@ -690,13 +629,13 @@ export default function SearchableFestivals({
           )}
         </div>
 
-        {/* List */}
+        {/* Cards */}
         <div className="px-4 pb-8">
           {filtered.length === 0 ? (
             <EmptyState hasFilters={hasFilters} onReset={reset} t={t.home} />
           ) : (
             <motion.ul
-              key={`mobile-${query}-${country}-${category}-${sort}`}
+              key={`mobile-${query}-${country}-${category}-${sort}-${[...methods].join(",")}`}
               className="grid gap-3 sm:grid-cols-2"
               variants={filtered.length <= 60 ? listVariants : undefined}
               initial={filtered.length <= 60 ? "hidden" : false}
@@ -722,40 +661,20 @@ export default function SearchableFestivals({
   );
 }
 
-/* ── Urgency group header ─────────────────────────────────── */
-function GroupHeader({ label, count, isHot }: { label: string; count: number; isHot: boolean }) {
-  return (
-    <div className="flex items-center gap-2 px-1 pt-2 pb-1">
-      <span
-        style={{
-          fontSize: "10px",
-          fontWeight: 600,
-          letterSpacing: "0.07em",
-          color: isHot ? "#DC2626" : "var(--text-muted)",
-          textTransform: "uppercase",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {isHot && <span style={{ marginRight: 4 }}>●</span>}{label}
-      </span>
-      <span
-        style={{
-          fontSize: "10px",
-          fontWeight: 500,
-          padding: "1px 6px",
-          borderRadius: 99,
-          background: isHot ? "rgba(220,38,38,0.08)" : "rgba(0,0,0,0.05)",
-          color: isHot ? "#DC2626" : "var(--text-muted)",
-        }}
-      >
-        {count}
-      </span>
-      <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-    </div>
-  );
-}
+// ── Animation variants ────────────────────────────────────────────────────────
 
-/* ── Stat pill ────────────────────────────────────────────── */
+const listVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.04 } },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 8 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] as const } },
+};
+
+// ── Stat pill ─────────────────────────────────────────────────────────────────
+
 function StatPill({ children }: { children: React.ReactNode }) {
   return (
     <span
@@ -776,7 +695,8 @@ function StatPill({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ── Empty state ──────────────────────────────────────────── */
+// ── Empty state ───────────────────────────────────────────────────────────────
+
 function EmptyState({
   hasFilters,
   onReset,
@@ -784,7 +704,7 @@ function EmptyState({
 }: {
   hasFilters: boolean;
   onReset: () => void;
-  t: ReturnType<typeof import("../../lib/i18n").getTranslations>["home"];
+  t: Translations["home"];
 }) {
   return (
     <div className="py-16 flex flex-col items-center gap-3 text-center">

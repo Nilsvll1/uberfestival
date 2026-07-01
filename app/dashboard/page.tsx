@@ -9,8 +9,11 @@ import {
   isValidLanguage,
 } from "../../lib/i18n";
 import FestivalCard from "../components/FestivalCard";
+import NewCollectionButton from "../components/NewCollectionButton";
 import { formatDeadline } from "../../lib/utils";
+import { getPersonalizedFeed } from "../../lib/recommendations";
 import type { Festival } from "../../lib/types";
+import type { RecommendedFestival } from "../../lib/recommendations";
 
 export const metadata: Metadata = {
   title: "Dashboard | UberFestival",
@@ -26,6 +29,15 @@ type ViewRow = {
   festivals: Festival;
 };
 
+type CollectionRow = {
+  id: string;
+  name: string;
+  slug: string;
+  is_public: boolean;
+  updated_at: string;
+  collection_items: { count: number }[];
+};
+
 export default async function DashboardPage() {
   const supabase = await createClient();
   const {
@@ -38,8 +50,7 @@ export default async function DashboardPage() {
   const rawLang = cookieStore.get(LANG_COOKIE)?.value;
   const lang = isValidLanguage(rawLang) ? rawLang : DEFAULT_LANGUAGE;
 
-  // Fetch profile, saved festivals, and recent views in parallel.
-  const [profileResult, savedResult, viewsResult] = await Promise.all([
+  const [profileResult, savedResult, viewsResult, collectionsResult] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase
       .from("saved_festivals")
@@ -52,11 +63,28 @@ export default async function DashboardPage() {
       .eq("user_id", user.id)
       .order("viewed_at", { ascending: false })
       .limit(6),
+    supabase
+      .from("collections")
+      .select("id, name, slug, is_public, updated_at, collection_items(count)")
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false })
+      .limit(12),
   ]);
 
   const profile = profileResult.data;
+
+  // Personalised recommendations for premium users (fetched after profile is known).
+  const recommendations: RecommendedFestival[] =
+    profile?.is_premium === true
+      ? await getPersonalizedFeed(
+          user.id,
+          profile?.primary_genre ?? null,
+          profile?.country ?? null,
+        ).then((r) => r.slice(0, 6))
+      : [];
   const savedRows = (savedResult.data ?? []) as unknown as SavedRow[];
   const viewRows = (viewsResult.data ?? []) as unknown as ViewRow[];
+  const collections = (collectionsResult.data ?? []) as unknown as CollectionRow[];
 
   // Strip application_url before passing festivals to FestivalCard (client component).
   // Replace with a boolean so the card can show the Premium gate or /api/apply/[id].
@@ -252,6 +280,86 @@ export default async function DashboardPage() {
         </section>
       )}
 
+      {/* ── Collections ───────────────────────────────────── */}
+      <section className="mb-10">
+        <div className="flex items-center justify-between mb-4">
+          <SectionHeader
+            label={lang === "fr" ? "Collections" : "Collections"}
+            icon={
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="1" y="1" width="5.5" height="5.5" rx="1.5"/>
+                <rect x="7.5" y="1" width="5.5" height="5.5" rx="1.5"/>
+                <rect x="1" y="7.5" width="5.5" height="5.5" rx="1.5"/>
+                <rect x="7.5" y="7.5" width="5.5" height="5.5" rx="1.5"/>
+              </svg>
+            }
+          />
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {collections.map((col) => {
+            const count = col.collection_items[0]?.count ?? 0;
+            return (
+              <Link
+                key={col.id}
+                href={`/dashboard/collections/${col.id}`}
+                className="rounded-[16px] border overflow-hidden flex flex-col transition-all hover:shadow-md"
+                style={{ textDecoration: "none", background: "#fff", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}
+              >
+                <div className="h-1.5" style={{ background: collectionGradient(col.name) }} />
+                <div className="p-4 flex flex-col gap-1">
+                  <p className="font-semibold truncate" style={{ fontSize: "14px", letterSpacing: "-0.02em", color: "var(--text-primary)" }}>
+                    {col.name}
+                  </p>
+                  <p style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                    {count} {lang === "fr" ? `festival${count !== 1 ? "s" : ""}` : `festival${count !== 1 ? "s" : ""}`}
+                    {col.is_public && (
+                      <> · <span style={{ color: "var(--accent)" }}>{lang === "fr" ? "Public" : "Public"}</span></>
+                    )}
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
+          <NewCollectionButton lang={lang} />
+        </div>
+      </section>
+
+      {/* ── Recommended for you (Premium) ──────────────────── */}
+      {recommendations.length > 0 && (
+        <section className="mb-10">
+          <div className="flex items-center justify-between mb-4">
+            <SectionHeader
+              label={lang === "fr" ? "Recommandé pour vous" : "Recommended for you"}
+              icon={
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12 1l2.5 5 5.5.8-4 3.9.9 5.5L12 14l-4.9 2.6.9-5.5L4 7.8 9.5 7z"/>
+                </svg>
+              }
+            />
+            <Link
+              href="/dashboard/recommendations"
+              style={{ fontSize: "13px", color: "var(--accent)", textDecoration: "none" }}
+              className="hover:opacity-70 transition-opacity font-medium"
+            >
+              {lang === "fr" ? "Voir tout →" : "See all →"}
+            </Link>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {recommendations.map((f, i) => (
+              <FestivalCard
+                key={f.id}
+                festival={f as unknown as Festival}
+                index={i}
+                lang={lang}
+                userId={user.id}
+                initialSaved={savedIds.includes(f.id)}
+                isPremium={true}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* ── Saved festivals ────────────────────────────────── */}
       <section className="mb-10">
         <div className="flex items-center justify-between mb-4">
@@ -352,6 +460,19 @@ export default async function DashboardPage() {
       )}
     </main>
   );
+}
+
+function collectionGradient(name: string): string {
+  const gs = [
+    "linear-gradient(90deg,#818CF8,#6366F1)",
+    "linear-gradient(90deg,#34D399,#059669)",
+    "linear-gradient(90deg,#F472B6,#EC4899)",
+    "linear-gradient(90deg,#FBBF24,#F59E0B)",
+    "linear-gradient(90deg,#60A5FA,#3B82F6)",
+    "linear-gradient(90deg,#A78BFA,#7C3AED)",
+  ];
+  const h = name.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  return gs[h % gs.length];
 }
 
 function SectionHeader({

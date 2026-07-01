@@ -4,7 +4,7 @@ import { memo } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import type { Festival } from "../../lib/types";
-import { formatDeadline, genreColor, getOpportunityScore, getUrgencyGroup } from "../../lib/utils";
+import { formatDeadline, genreColor } from "../../lib/utils";
 import { getFestivalImage } from "../../lib/festivalImage";
 import type { Language } from "../../lib/i18n";
 import { getTranslations } from "../../lib/i18n";
@@ -12,7 +12,6 @@ import SaveButton from "./SaveButton";
 import FestivalImage from "./FestivalImage";
 import { ApplicationStatusBadge, isApplyNowStatus } from "./ApplicationStatusBadge";
 
-// Premium layered shadow — Linear/Stripe style
 const SHADOW_BASE =
   "0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)";
 const SHADOW_HOVER =
@@ -37,33 +36,17 @@ const FestivalCard = memo(function FestivalCard({
   initialSaved?: boolean;
   isPremium?: boolean | null;
 }) {
-  const t        = getTranslations(lang);
+  const t       = getTranslations(lang);
   const deadline = formatDeadline(festival.submission_deadline, lang);
   const color    = festival.category ? genreColor(festival.category) : null;
   const image    = getFestivalImage(festival.category, festival.id, festival.hero_image_url);
-  const isUrgent = deadline?.status === "urgent";
-  const isSoon   = deadline?.status === "soon";
-  const score    = getOpportunityScore(festival);
-  const urgGroup = getUrgencyGroup(festival.submission_deadline);
-
-  const deadlineColor =
-    isUrgent ? "#DC2626" :
-    isSoon   ? "#CA8A04" :
-    deadline?.status === "expired" ? "var(--text-muted)" :
-    "#16A34A";
-
-  const urgentAccent = isUrgent
-    ? "inset 3px 0 0 #DC2626"
-    : isSoon
-    ? "inset 3px 0 0 #CA8A04"
-    : null;
 
   const activeShadow = isActive
     ? "0 0 0 2px var(--accent), 0 4px 16px rgba(99,102,241,0.18)"
     : null;
 
-  const boxShadow = [urgentAccent, activeShadow, SHADOW_BASE].filter(Boolean).join(", ");
-  const hoverShadow = [urgentAccent, SHADOW_HOVER].filter(Boolean).join(", ");
+  const boxShadow   = [activeShadow, SHADOW_BASE].filter(Boolean).join(", ");
+  const hoverShadow = SHADOW_HOVER;
 
   return (
     <motion.div
@@ -107,49 +90,6 @@ const FestivalCard = memo(function FestivalCard({
           userId={userId}
           initialSaved={initialSaved}
         />
-
-        {/* Opportunity score badge — top left */}
-        {score.tier !== "limited" && (
-          <div
-            className="absolute top-2.5 left-2.5 z-10 tabular-nums"
-            style={{
-              background: score.bg,
-              color: score.color,
-              border: `1px solid ${score.color}33`,
-              backdropFilter: "blur(8px)",
-              WebkitBackdropFilter: "blur(8px)",
-              borderRadius: 7,
-              padding: "2px 6px",
-              fontSize: "10.5px",
-              fontWeight: 700,
-              letterSpacing: "0.01em",
-              lineHeight: 1.4,
-            }}
-          >
-            {score.score}
-          </div>
-        )}
-
-        {/* Closing-soon urgency pill — bottom right (replaces when space allows) */}
-        {urgGroup === "this-week" && deadline && deadline.status !== "expired" && (
-          <div
-            className="absolute bottom-3 right-3 z-10 flex items-center gap-1"
-            style={{
-              background: "rgba(220,38,38,0.88)",
-              color: "#fff",
-              backdropFilter: "blur(8px)",
-              WebkitBackdropFilter: "blur(8px)",
-              borderRadius: 6,
-              padding: "2px 7px",
-              fontSize: "10px",
-              fontWeight: 600,
-              letterSpacing: "0.01em",
-            }}
-          >
-            <span style={{ fontSize: 9 }}>●</span>
-            {deadline.label}
-          </div>
-        )}
       </Link>
 
       {/* ── Card body ─────────────────────────────────────────── */}
@@ -157,8 +97,9 @@ const FestivalCard = memo(function FestivalCard({
         <div>
           <Link
             href={`/festival/${festival.id}`}
-            className="font-bold leading-snug block hover:text-[var(--accent)] transition-colors"
+            className="font-bold leading-snug block hover:text-[var(--accent)] transition-colors truncate"
             style={{ fontSize: "15px", letterSpacing: "-0.025em", color: "var(--text-primary)" }}
+            title={festival.festival_name}
           >
             {festival.festival_name}
           </Link>
@@ -188,18 +129,12 @@ const FestivalCard = memo(function FestivalCard({
         >
           {deadline ? (
             <span
-              className="text-[11px] font-medium tabular-nums flex items-center gap-1.5"
+              className="min-w-0 text-[11px] tabular-nums flex items-center gap-1.5 truncate"
               style={{
-                color: deadlineColor,
+                color: deadline.status === "expired" ? "var(--text-muted)" : "var(--text-secondary)",
                 textDecoration: deadline.status === "expired" ? "line-through" : "none",
               }}
             >
-              {isUrgent && (
-                <span
-                  className="urgency-dot shrink-0"
-                  style={{ display: "inline-block", width: 5, height: 5, borderRadius: "50%", background: "#DC2626" }}
-                />
-              )}
               {deadline.label}
             </span>
           ) : (
@@ -230,9 +165,9 @@ const FestivalCard = memo(function FestivalCard({
               </svg>
             </a>
           ) : festival.application_status === "contact_submission" ? (
-            <ApplicationStatusBadge status="contact_submission" />
+            <span className="shrink-0"><ApplicationStatusBadge status="contact_submission" /></span>
           ) : festival.application_status === "invitation_only" || festival.application_status === "seasonally_closed" ? (
-            <ApplicationStatusBadge status={festival.application_status} />
+            <span className="shrink-0"><ApplicationStatusBadge status={festival.application_status} /></span>
           ) : festival.website ? (
             <a
               href={festival.website}

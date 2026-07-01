@@ -1,27 +1,11 @@
 "use client";
 
-// Maps the 8-value application_status enum to 4 user-facing display states.
-// This component is safe to use in client components — it receives only the
-// status string, never the actual application_url.
+import { isApplyNowStatus } from "../../lib/utils";
+import type { ApplicationStatus } from "../../lib/utils";
 
-export type ApplicationStatus =
-  | "verified_application"
-  | "email_submission"
-  | "filmfreeway"
-  | "festhome"
-  | "contact_form"
-  | "contact_submission"
-  | "invitation_only"
-  | "seasonally_closed"
-  | "unknown";
-
-const APPLY_NOW_STATUSES = new Set<ApplicationStatus>([
-  "verified_application",
-  "filmfreeway",
-  "festhome",
-  "email_submission",
-  "contact_form",
-]);
+// Re-export from lib/utils so client-side importers (FestivalCard) don't need to change.
+export { isApplyNowStatus } from "../../lib/utils";
+export type { ApplicationStatus } from "../../lib/utils";
 
 type BadgeSize = "sm" | "md";
 
@@ -35,7 +19,7 @@ export function ApplicationStatusBadge({
   if (!status || status === "unknown") return null;
 
   const s = status as ApplicationStatus;
-  const isApply   = APPLY_NOW_STATUSES.has(s);
+  const isApply   = isApplyNowStatus(s);
   const isContact = s === "contact_submission";
   const isInvite  = s === "invitation_only";
   const isClosed  = s === "seasonally_closed";
@@ -136,9 +120,4 @@ export function ApplicationStatusBadge({
       Closed for Now
     </span>
   );
-}
-
-export function isApplyNowStatus(status: string | null | undefined): boolean {
-  if (!status) return false;
-  return APPLY_NOW_STATUSES.has(status as ApplicationStatus);
 }

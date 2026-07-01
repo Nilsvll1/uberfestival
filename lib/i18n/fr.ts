@@ -18,7 +18,7 @@ export const fr: Translations = {
     search: "Rechercher une opportunité…",
     country: "Pays",
     genre: "Genre",
-    deadline: "Urgent",
+    deadline: "Deadline",
     az: "A–Z",
     reset: "Réinitialiser",
     emptyTitle: "Aucune opportunité trouvée",
@@ -33,19 +33,6 @@ export const fr: Translations = {
       if (genre) return [`${n} opportunités`, `${genre}.`];
       if (country) return [`${n} opportunité${n !== 1 ? "s" : ""}`, `en ${country}.`];
       return [`${n} opportunité${n !== 1 ? "s" : ""}`, `disponible${n !== 1 ? "s" : ""}.`];
-    },
-    closingSoon: (n) => `${n} ferment cette semaine`,
-    urgencyGroups: {
-      thisWeek:   "Cette semaine",
-      thisMonth:  "Ce mois-ci",
-      upcoming:   "À venir",
-      noDeadline: "Deadline ouverte",
-      expired:    "Fermé",
-    },
-    urgencyTabs: {
-      all:       "Tout",
-      thisWeek:  (n) => n > 0 ? `Cette semaine · ${n}` : "Cette semaine",
-      thisMonth: (n) => n > 0 ? `Ce mois · ${n}` : "Ce mois",
     },
   },
   card: {
